@@ -1,6 +1,12 @@
-# IDP Service
+# Stout Services
 
-Sources:
+## Content
 
-- <https://github.com/go-oauth2/oauth2/blob/master/README.md>
-- <https://github.com/vgarvardt/go-oauth2-pg>
+1. [Docs](docs/README.md)
+2.
+
+## Quickstart Docker Compose
+
+```bash
+docker compose up
+```
