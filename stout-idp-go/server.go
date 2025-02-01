@@ -1,4 +1,4 @@
-package main
+eapackage main
 
 import (
 	"context"
@@ -18,7 +18,7 @@ import (
 	"github.com/vgarvardt/go-pg-adapter/pgx4adapter"
 )
 
-const DATABASE_URL = "user=admin password=admin host=127.0.0.1 port=5432 dbname=idp sslmode=disable"
+const DATABASE_URL = "user=golang password=golang host=127.0.0.1 port=5432 dbname=golang sslmode=disable"
 
 func main() {
 	// Connect to the database and create a new adapter
