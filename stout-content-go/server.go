@@ -13,6 +13,7 @@ const CV_PATH = "./assets/Teun-Johán-Stout.pdf"
 func main() {
 	http.HandleFunc("/v1/content/cv", handleDownloadCv)
 
+	log.Println("Started on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 

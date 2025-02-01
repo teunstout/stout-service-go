@@ -1,4 +1,4 @@
-eapackage main
+package main
 
 import (
 	"context"
@@ -87,6 +87,7 @@ func main() {
 		handleClientTokens(w, r, conn)
 	})
 
+	log.Println("Started on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":9096", nil))
 }
 
