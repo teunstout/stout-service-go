@@ -21,6 +21,12 @@ func InitDatabase(conn *pgx.Conn) error {
 	if err := createAccountsTable(conn); err != nil {
 		return err
 	}
+	if err := createSessionTokenTable(conn); err != nil {
+		return err
+	}
+	if err := createCsrfTokenTable(conn); err != nil {
+		return err
+	}
 
 	return nil
 }

@@ -1,0 +1,42 @@
+package postgres
+
+import (
+	"context"
+	"fmt"
+	"time"
+
+	"github.com/jackc/pgx/v4"
+)
+
+func createSessionTokenTable(conn *pgx.Conn) error {
+	fmt.Println("Creating session_tokens table")
+	_, err := conn.Exec(context.Background(), `
+        CREATE TABLE IF NOT EXISTS session_tokens (
+            id SERIAL PRIMARY KEY,
+            token VARCHAR(32) NOT NULL,
+            account_id INTEGER NOT NULL,
+            created_at TIMESTAMP NOT NULL DEFAULT NOW(),
+            expires_at TIMESTAMP NOT NULL,
+            FOREIGN KEY (account_id) REFERENCES accounts(id),
+			UNIQUE (token, account_id)
+        );
+        CREATE INDEX IF NOT EXISTS idx_session_account_id ON session_tokens(account_id);
+        CREATE INDEX IF NOT EXISTS idx_session_token ON session_tokens(token);
+    `)
+	return err
+}
+
+func CreateSessionToken(conn *pgx.Conn, token, accountID string, expiresAt time.Time) error {
+	_, err := conn.Exec(context.Background(), `
+		INSERT INTO session_tokens (token, account_id, expires_at)
+		VALUES ($1, $2, $3)
+	`, token, accountID, expiresAt)
+	return err
+}
+
+func DeleteSessionToken(conn *pgx.Conn, token string) error {
+	_, err := conn.Exec(context.Background(), `
+		DELETE FROM session_tokens WHERE token = $1
+	`, token)
+	return err
+}

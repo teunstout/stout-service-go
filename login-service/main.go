@@ -3,9 +3,14 @@ package main
 import (
 	"log"
 	"net/http"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 	"stout.dev/login/postgres"
+)
+
+const (
+	internalServerErrorMessage = "Banana machine not working"
 )
 
 type Login struct {
@@ -36,11 +41,15 @@ func main() {
 	})
 
 	http.HandleFunc("/v1/logout", func(w http.ResponseWriter, r *http.Request) {
-		// handleLogout(w, r, conn)
+		handleLogout(w, r, conn)
 	})
 
 	log.Println("Server running on port 8080")
 	http.ListenAndServe(":8080", nil)
+}
+
+func handleLogout(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
@@ -70,6 +79,37 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 		return
 	}
 
+	sessionToken := generateSecureToken()
+	tokenExpiration := time.Now().Add(time.Hour * 1) // 1 hours
+
+	if err = postgres.CreateSessionToken(conn, username, sessionToken, tokenExpiration); err != nil {
+		log.Printf("Error creating session token: %v", err)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    sessionToken,
+		Expires:  tokenExpiration,
+		HttpOnly: true,
+	})
+
+	csrfToken := generateSecureToken()
+
+	if err = postgres.CreateCsrfToken(conn, username, sessionToken, tokenExpiration); err != nil {
+		log.Printf("Error creating csrf token: %v", err)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		return
+	}
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrfToken,
+		Expires:  tokenExpiration,
+		HttpOnly: false,
+	})
+
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Minion logged in successfully"))
 }
@@ -91,7 +131,7 @@ func handleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	exists, err := postgres.AccountExists(conn, username)
 	if err != nil {
 		log.Printf("Error checking if account exists: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, "", http.StatusForbidden)
 		return
 	}
 	if exists {
@@ -103,13 +143,13 @@ func handleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	hashedPassword, err := hashPassword(password)
 	if err != nil {
 		log.Printf("Error hashing password: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	if err = postgres.CreateAccount(conn, username, hashedPassword); err != nil {
 		log.Printf("Error creating account: %v", err)
-		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
