@@ -2,7 +2,6 @@ package main
 
 import (
 	"context"
-	"encoding/json"
 	"fmt"
 	"log"
 	"net/http"
@@ -13,22 +12,25 @@ import (
 	"github.com/go-oauth2/oauth2/v4/manage"
 	"github.com/go-oauth2/oauth2/v4/models"
 	"github.com/go-oauth2/oauth2/v4/server"
-	"github.com/go-session/session"
 	"github.com/jackc/pgx/v4"
 	pg "github.com/vgarvardt/go-oauth2-pg/v4"
 	"github.com/vgarvardt/go-pg-adapter/pgx4adapter"
+	"stout.dev/authorization-service/database"
+	"stout.dev/authorization-service/login"
 )
 
-const DATABASE_URL = "user=golang password=golang host=127.0.0.1 port=5432 dbname=golang sslmode=disable"
-
 func main() {
-	// Connect to the database and create a new adapter
-	conn, err := pgx.Connect(context.Background(), DATABASE_URL)
+	conn, err := database.Connect()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
 	defer conn.Close(context.Background())
+
+	if err = database.CreateTables(conn); err != nil {
+		fmt.Fprintf(os.Stderr, "Unable to create tables: %v\n", err)
+		os.Exit(1)
+	}
 
 	adapter := pgx4adapter.NewConn(conn)
 
@@ -60,9 +62,9 @@ func main() {
 	srv := server.NewDefaultServer(manager)
 	srv.SetAllowGetAccessRequest(true)
 	srv.SetClientInfoHandler(server.ClientFormHandler)
-	srv.SetPasswordAuthorizationHandler(PasswordAuthorizationHandler)
-
-	srv.SetUserAuthorizationHandler(userAuthorizeHandler)
+	srv.SetUserAuthorizationHandler(func(w http.ResponseWriter, r *http.Request) (userID string, err error) {
+		return userAuthorizeHandler(conn, w, r)
+	})
 
 	// Set the internal and response error handlers
 	srv.SetInternalErrorHandler(func(err error) (re *errors.Response) {
@@ -73,11 +75,6 @@ func main() {
 	srv.SetResponseErrorHandler(func(re *errors.Response) {
 		log.Println("Response Error:", re.Error.Error())
 	})
-
-	// Endpoints
-	http.HandleFunc("/login", loginHandler)
-
-	http.HandleFunc("/auth", authHandler)
 
 	http.HandleFunc("/oauth/authorize", func(w http.ResponseWriter, r *http.Request) {
 		err := srv.HandleAuthorizeRequest(w, r)
@@ -91,154 +88,29 @@ func main() {
 		srv.HandleTokenRequest(w, r)
 	})
 
-	http.HandleFunc("/v1/clients", func(w http.ResponseWriter, r *http.Request) {
-		handleClientRequests(w, r, conn)
-	})
-
-	http.HandleFunc("/v1/tokens", func(w http.ResponseWriter, r *http.Request) {
-		handleClientTokens(w, r, conn)
-	})
-
 	log.Println("Started on http://localhost:9096")
 	log.Fatal(http.ListenAndServe(":9096", nil))
 }
 
-func userAuthorizeHandler(w http.ResponseWriter, r *http.Request) (userID string, err error) {
-	store, err := session.Start(r.Context(), w, r)
+func userAuthorizeHandler(conn *pgx.Conn, w http.ResponseWriter, r *http.Request) (userID string, err error) {
+	if r.Method != http.MethodPost {
+		http.Error(w, "Invalid request method", http.StatusMethodNotAllowed)
+		return
+	}
+
+	username := r.FormValue("username")
+	password := r.FormValue("password")
+
+	if username == "" || password == "" {
+		http.Error(w, "Username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	userID, err = login.AuthenticateUser(conn, username, password)
 	if err != nil {
-		log.Println(err)
-		return
-	}
-	log.Println(store)
-
-	uid, ok := store.Get("LoggedInUserID")
-	if !ok {
-		log.Println("User is not logged in")
-		if r.Form == nil {
-			r.ParseForm()
-		}
-
-		store.Set("ReturnUri", r.Form)
-		store.Save()
-
-		w.Header().Set("Location", "/login")
-		w.WriteHeader(http.StatusFound)
+		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return
 	}
 
-	log.Println(uid)
-	userID = uid.(string)
-	store.Delete("LoggedInUserID")
-	store.Save()
-	return
-}
-
-func PasswordAuthorizationHandler(ctx context.Context, clientID, username, password string) (userID string, err error) {
-	if username == "test" && password == "test" {
-		userID = "test"
-	}
-	return
-}
-
-func handleClientRequests(w http.ResponseWriter, _ *http.Request, conn *pgx.Conn) {
-	rows, err := conn.Query(context.Background(), "SELECT id, secret, domain FROM oauth2_clients ORDER BY id ASC")
-	if err != nil {
-		http.Error(w, "Invalid client_id", http.StatusBadRequest)
-		return
-	}
-	defer rows.Close()
-
-	var clients []models.Client
-	for rows.Next() {
-		var client models.Client
-		err := rows.Scan(&client.ID, &client.Secret, &client.Domain)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Error scanning client", http.StatusInternalServerError)
-			return
-		}
-		clients = append(clients, client)
-	}
-
-	// Return the clients as JSON
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(clients)
-}
-
-func handleClientTokens(w http.ResponseWriter, _ *http.Request, conn *pgx.Conn) {
-	rows, err := conn.Query(context.Background(), "SELECT code, access, refresh FROM oauth2_tokens ORDER BY id ASC")
-	if err != nil {
-		http.Error(w, "Invalid client_id", http.StatusBadRequest)
-		return
-	}
-	defer rows.Close()
-
-	var tokens []models.Token
-	for rows.Next() {
-		var token models.Token
-		err := rows.Scan(&token.Code, &token.Access, &token.Refresh)
-		if err != nil {
-			log.Println(err)
-			http.Error(w, "Error scanning client", http.StatusInternalServerError)
-			return
-		}
-		tokens = append(tokens, token)
-	}
-
-	// Return the clients as JSON
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(http.StatusOK)
-	json.NewEncoder(w).Encode(tokens)
-}
-
-func loginHandler(w http.ResponseWriter, r *http.Request) {
-	store, err := session.Start(r.Context(), w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if r.Method == "POST" {
-		if r.Form == nil {
-			if err := r.ParseForm(); err != nil {
-				http.Error(w, err.Error(), http.StatusInternalServerError)
-				return
-			}
-		}
-		store.Set("LoggedInUserID", r.Form.Get("username"))
-		store.Save()
-
-		w.Header().Set("Location", "/auth")
-		w.WriteHeader(http.StatusFound)
-		return
-	}
-	outputHTML(w, r, "static/login.html")
-}
-
-func authHandler(w http.ResponseWriter, r *http.Request) {
-	store, err := session.Start(nil, w, r)
-	if err != nil {
-		http.Error(w, err.Error(), http.StatusInternalServerError)
-		return
-	}
-
-	if _, ok := store.Get("LoggedInUserID"); !ok {
-		w.Header().Set("Location", "/login")
-		w.WriteHeader(http.StatusFound)
-		return
-	}
-
-	outputHTML(w, r, "static/auth.html")
-}
-
-func outputHTML(w http.ResponseWriter, req *http.Request, filename string) {
-	file, err := os.Open(filename)
-	if err != nil {
-		http.Error(w, err.Error(), 500)
-		return
-	}
-	defer file.Close()
-	fi, _ := file.Stat()
-	http.ServeContent(w, req, file.Name(), fi.ModTime(), file)
+	return userID, nil
 }
