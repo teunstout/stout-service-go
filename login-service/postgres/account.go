@@ -3,9 +3,18 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/jackc/pgx/v4"
 )
+
+type Account struct {
+	ID        int32
+	Username  string
+	Password  string
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
 
 func createAccountsTable(conn *pgx.Conn) error {
 	fmt.Println("Creating accounts table")
@@ -37,10 +46,11 @@ func CreateAccount(conn *pgx.Conn, username string, password string) error {
 	return err
 }
 
-func GetAccountPassword(conn *pgx.Conn, username string) (string, error) {
-	var password string
+func GetAccount(conn *pgx.Conn, username string) (Account, error) {
+	var account Account
 	err := conn.QueryRow(context.Background(), `
-		SELECT password FROM accounts WHERE username = LOWER($1)
-	`, username).Scan(&password)
-	return password, err
+		SELECT id, username, password, created_at, updated_at
+		FROM accounts WHERE username = LOWER($1)
+	`, username).Scan(&account.ID, &account.Username, &account.Password, &account.CreatedAt, &account.UpdatedAt)
+	return account, err
 }

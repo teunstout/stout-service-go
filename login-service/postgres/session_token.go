@@ -13,7 +13,7 @@ func createSessionTokenTable(conn *pgx.Conn) error {
 	_, err := conn.Exec(context.Background(), `
         CREATE TABLE IF NOT EXISTS session_tokens (
             id SERIAL PRIMARY KEY,
-            token VARCHAR(32) NOT NULL,
+            token VARCHAR(64) NOT NULL,
             account_id INTEGER NOT NULL,
             created_at TIMESTAMP NOT NULL DEFAULT NOW(),
             expires_at TIMESTAMP NOT NULL,
@@ -26,7 +26,7 @@ func createSessionTokenTable(conn *pgx.Conn) error {
 	return err
 }
 
-func CreateSessionToken(conn *pgx.Conn, token, accountID string, expiresAt time.Time) error {
+func CreateSessionToken(conn *pgx.Conn, token string, accountID int32, expiresAt time.Time) error {
 	_, err := conn.Exec(context.Background(), `
 		INSERT INTO session_tokens (token, account_id, expires_at)
 		VALUES ($1, $2, $3)

@@ -66,14 +66,14 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 		return
 	}
 
-	hashedPassword, err := postgres.GetAccountPassword(conn, username)
+	account, err := postgres.GetAccount(conn, username)
 	if err != nil {
 		log.Printf("Error getting password: %v", err)
 		http.Error(w, "Minion not found", http.StatusUnauthorized)
 		return
 	}
 
-	if passed := checkPasswordHash(password, hashedPassword); !passed {
+	if passed := checkPasswordHash(password, account.Password); !passed {
 		log.Printf("Error checking password: %v", err)
 		http.Error(w, "Minion not found", http.StatusUnauthorized)
 		return
@@ -82,7 +82,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	sessionToken := generateSecureToken()
 	tokenExpiration := time.Now().Add(time.Hour * 1) // 1 hours
 
-	if err = postgres.CreateSessionToken(conn, username, sessionToken, tokenExpiration); err != nil {
+	if err = postgres.CreateSessionToken(conn, sessionToken, account.ID, tokenExpiration); err != nil {
 		log.Printf("Error creating session token: %v", err)
 		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return
@@ -91,13 +91,14 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "session_token",
 		Value:    sessionToken,
+		Path:     "/",
 		Expires:  tokenExpiration,
 		HttpOnly: true,
 	})
 
 	csrfToken := generateSecureToken()
 
-	if err = postgres.CreateCsrfToken(conn, username, sessionToken, tokenExpiration); err != nil {
+	if err = postgres.CreateCsrfToken(conn, sessionToken, account.ID, tokenExpiration); err != nil {
 		log.Printf("Error creating csrf token: %v", err)
 		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return
@@ -106,6 +107,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     "csrf_token",
 		Value:    csrfToken,
+		Path:     "/",
 		Expires:  tokenExpiration,
 		HttpOnly: false,
 	})
