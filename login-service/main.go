@@ -10,7 +10,10 @@ import (
 )
 
 const (
-	internalServerErrorMessage = "Banana machine not working"
+	internalServerErrorMessage = "Minion broke the banana machine not working"
+	methodNotAllowedMessage    = "Minion not allowed"
+	statusUnauthorizedMessage  = "Minion is unauthorized"
+	statusForbiddenMessage     = "Minion tried something naughty"
 )
 
 type Login struct {
@@ -49,12 +52,38 @@ func main() {
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+	if r.Method != http.MethodPost {
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
+		return
+	}
 
+	sessionToken := r.FormValue("session_token")
+	csrfToken := r.FormValue("csrf_token")
+
+	if sessionToken == "" || csrfToken == "" {
+		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		return
+	}
+
+	if err := postgres.DeleteSessionToken(conn, sessionToken); err != nil {
+		log.Printf("Error deleting session token: %v", err)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		return
+	}
+
+	if err := postgres.DeleteCsrfToken(conn, csrfToken); err != nil {
+		log.Printf("Error deleting csrf token: %v", err)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Minion logged out successfully"))
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -69,13 +98,13 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	account, err := postgres.GetAccount(conn, username)
 	if err != nil {
 		log.Printf("Error getting password: %v", err)
-		http.Error(w, "Minion not found", http.StatusUnauthorized)
+		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
 	if passed := checkPasswordHash(password, account.Password); !passed {
 		log.Printf("Error checking password: %v", err)
-		http.Error(w, "Minion not found", http.StatusUnauthorized)
+		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
@@ -118,7 +147,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 
 func handleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	if r.Method != http.MethodPost {
-		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
