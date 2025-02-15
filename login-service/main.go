@@ -52,29 +52,67 @@ func main() {
 }
 
 func handleLogout(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
-	if r.Method != http.MethodPost {
+	if r.Method != http.MethodGet {
 		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
-	sessionToken := r.FormValue("session_token")
-	csrfToken := r.FormValue("csrf_token")
-
-	if sessionToken == "" || csrfToken == "" {
+	sessionToken, err := r.Cookie("session_token")
+	if err != nil {
 		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
 		return
 	}
 
-	if err := postgres.DeleteSessionToken(conn, sessionToken); err != nil {
-		log.Printf("Error deleting session token: %v", err)
+	csrfToken := r.Header.Get("x-csrf-token")
+	if csrfToken == "" {
+		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		return
+	}
+
+	accountID, err := postgres.GetAccountIdBySessionToken(conn, sessionToken.Value)
+	if err != nil {
+		log.Printf("Error getting account id: %v", err)
 		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
-	if err := postgres.DeleteCsrfToken(conn, csrfToken); err != nil {
-		log.Printf("Error deleting csrf token: %v", err)
+	csrfAccountID, err := postgres.GetCsrfIdBySessionToken(conn, csrfToken)
+	if err != nil {
+		log.Printf("Error getting csrf account id: %v", err)
 		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return
+	}
+
+	if accountID != csrfAccountID {
+		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		return
+	}
+
+	logoutAllDevices := r.URL.Query().Get("all_devices") == "true"
+	if logoutAllDevices {
+		if err := postgres.DeleteCsrfTokensByAccountId(conn, accountID); err != nil {
+			log.Printf("Error deleting csrf tokens: %v", err)
+			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			return
+		}
+
+		if err := postgres.DeleteSessionTokensByAccountId(conn, accountID); err != nil {
+			log.Printf("Error deleting session tokens: %v", err)
+			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			return
+		}
+	} else {
+		if err := postgres.DeleteCsrfToken(conn, csrfToken); err != nil {
+			log.Printf("Error deleting csrf token: %v", err)
+			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			return
+		}
+
+		if err := postgres.DeleteSessionToken(conn, sessionToken.Value); err != nil {
+			log.Printf("Error deleting session token: %v", err)
+			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			return
+		}
 	}
 
 	w.WriteHeader(http.StatusOK)
@@ -127,7 +165,7 @@ func handleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 
 	csrfToken := generateSecureToken()
 
-	if err = postgres.CreateCsrfToken(conn, sessionToken, account.ID, tokenExpiration); err != nil {
+	if err = postgres.CreateCsrfToken(conn, csrfToken, account.ID, tokenExpiration); err != nil {
 		log.Printf("Error creating csrf token: %v", err)
 		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
 		return

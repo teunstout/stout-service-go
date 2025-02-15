@@ -34,6 +34,21 @@ func CreateCsrfToken(conn *pgx.Conn, token string, accountID int32, expiresAt ti
 	return err
 }
 
+func GetCsrfIdBySessionToken(conn *pgx.Conn, token string) (int32, error) {
+	var accountID int32
+	err := conn.QueryRow(context.Background(), `
+		SELECT account_id FROM csrf_tokens WHERE token = $1
+	`, token).Scan(&accountID)
+	return accountID, err
+}
+
+func DeleteCsrfTokensByAccountId(conn *pgx.Conn, accountID int32) error {
+	_, err := conn.Exec(context.Background(), `
+		DELETE FROM csrf_tokens WHERE account_id = $1
+	`, accountID)
+	return err
+}
+
 func DeleteCsrfToken(conn *pgx.Conn, token string) error {
 	_, err := conn.Exec(context.Background(), `
 		DELETE FROM csrf_tokens WHERE token = $1
