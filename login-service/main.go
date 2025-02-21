@@ -1,38 +1,75 @@
 package main
 
 import (
+	"context"
+	"crypto/rsa"
 	"log"
 	"net/http"
+	"os"
 
-	"stout.dev/login/postgres"
+	"github.com/golang-jwt/jwt/v5"
+	"stout.dev/login/common/postgres"
+	"stout.dev/login/common/security"
+	v1 "stout.dev/login/v1"
+)
+
+const (
+	privKeyPath = "common/security/app.rsa"     // openssl genrsa -out app.rsa 3072
+	pubKeyPath  = "common/security/app.rsa.pub" // openssl rsa -in app.rsa -pubout > app.rsa.pub
+)
+
+var (
+	verifyKey  *rsa.PublicKey
+	signKey    *rsa.PrivateKey
+	serverPort int
 )
 
 func main() {
 	conn, err := postgres.Connect()
-	if err != nil {
-		panic(err)
-	}
+	fatal(err)
+	defer conn.Close(context.Background())
 
-	if err := postgres.InitDatabase(conn); err != nil {
-		panic(err)
-	}
+	err = postgres.InitDatabase(conn)
+	fatal(err)
+
+	signBytes, err := os.ReadFile(privKeyPath)
+	fatal(err)
+
+	signKey, err = jwt.ParseRSAPrivateKeyFromPEM(signBytes)
+	fatal(err)
+
+	verifyBytes, err := os.ReadFile(pubKeyPath)
+	fatal(err)
+
+	verifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyBytes)
+	fatal(err)
 
 	http.HandleFunc("/v1/register", func(w http.ResponseWriter, r *http.Request) {
-		handleRegister(w, r, conn)
+		v1.HandleRegister(w, r, conn)
 	})
 
 	http.HandleFunc("/v1/login", func(w http.ResponseWriter, r *http.Request) {
-		handleLogin(w, r, conn)
+		v1.HandleLogin(w, r, conn)
 	})
 
 	http.HandleFunc("/v1/logout", func(w http.ResponseWriter, r *http.Request) {
-		handleLogout(w, r, conn)
+		v1.HandleLogout(w, r, conn)
 	})
 
-	// http.HandleFunc("/v1/authenticate", func(w http.ResponseWriter, r *http.Request) {
-	// 	// handleAuthenticate(w, r, conn)
-	// })
+	http.HandleFunc("/v1/authenticate", func(w http.ResponseWriter, r *http.Request) {
+		// handleAuthenticate(w, r, conn)
+	})
+
+	http.HandleFunc("/v1/jwt", func(w http.ResponseWriter, r *http.Request) {
+		security.CreateJwt(w, r, signKey)
+	})
 
 	log.Println("Server running on port 8080")
 	http.ListenAndServe(":8080", nil)
+}
+
+func fatal(err error) {
+	if err != nil {
+		log.Fatal(err)
+	}
 }
