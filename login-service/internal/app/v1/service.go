@@ -6,8 +6,8 @@ import (
 	"time"
 
 	"github.com/jackc/pgx/v4"
-	"stout.dev/login/common/postgres"
-	"stout.dev/login/common/security"
+	"stout.dev/login/internal/pkg/postgres"
+	"stout.dev/login/internal/pkg/security"
 )
 
 const (
