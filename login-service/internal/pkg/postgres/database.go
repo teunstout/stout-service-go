@@ -3,14 +3,20 @@ package postgres
 import (
 	"context"
 	"fmt"
+	"os"
 
 	"github.com/jackc/pgx/v4"
 )
 
-const DATABASE_URL = "user=golang password=golang host=127.0.0.1 port=5432 dbname=golang sslmode=disable"
+const DATABASE_URL = "user=golang password=golang host=http://raspberrypi.local port=5432 dbname=development sslmode=disable"
 
 func Connect() (*pgx.Conn, error) {
-	conn, err := pgx.Connect(context.Background(), DATABASE_URL)
+	connString := os.Getenv("CONNECTION_STRING")
+	if connString == "" {
+		connString = DATABASE_URL
+	}
+
+	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %v", err)
 	}

@@ -1,6 +1,6 @@
 module stout.dev/authorization-service
 
-go 1.23.3
+go 1.24.0
 
 require (
 	github.com/go-oauth2/oauth2/v4 v4.5.2
