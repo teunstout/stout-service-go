@@ -1,10 +1,9 @@
 #!/bin/bash
 
-docker run \
-    --network teunstout \
-    -e CONNECTION_STRING='user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable' \
-    login-service
-
+# docker run \
+#     --network teunstout \
+#     -e CONNECTION_STRING='user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable' \
+#     login-service
 
 cd ./authorization-service
 go build .

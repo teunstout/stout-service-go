@@ -15,8 +15,8 @@ import (
 	"github.com/jackc/pgx/v4"
 	pg "github.com/vgarvardt/go-oauth2-pg/v4"
 	"github.com/vgarvardt/go-pg-adapter/pgx4adapter"
-	"stout.dev/authorization-service/database"
-	"stout.dev/authorization-service/login"
+	"stout.dev/authorization/database"
+	"stout.dev/authorization/login"
 )
 
 func main() {
