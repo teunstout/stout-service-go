@@ -19,7 +19,7 @@ docker build -t jisho-service .
 
 cd ./login-service
 go build .
-docker build -t jisho-service .
+docker build -t login-service .
 
 cd ./nginx
 go build .
