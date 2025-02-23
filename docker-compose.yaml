@@ -3,26 +3,58 @@ version: '3.9'
 services:
   postgres:
     image: postgres:17
-    container_name: postgres_db
+    container_name: postgres
     environment:
       POSTGRES_USER: golang
       POSTGRES_PASSWORD: golang
-      POSTGRES_DB: golang
+      POSTGRES_DB: development
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
 
-  pgadmin:
-    image: dpage/pgadmin4
-    container_name: pgadmin
-    environment:
-      PGADMIN_DEFAULT_EMAIL: admin@admin.com
-      PGADMIN_DEFAULT_PASSWORD: admin
-    ports:
-      - "8082:80"
+  # authorization-service:
+  #   build: ./authorization-service
+  #   container_name: authorization_service
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+
+  content-service:
+    build: ./content-service
+    container_name: content_service
     depends_on:
       - postgres
+    environment:
+      CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+
+  # jisho-service:
+  #   build: ./jisho-service
+  #   container_name: jisho_service
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+
+  login-service:
+    build: ./login-service
+    container_name: login_service
+    depends_on:
+      - postgres
+    environment:
+      CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+
+  nginx:
+    image: ./nginx
+    container_name: nginx
+    ports:
+      - "8080:8080"
+    depends_on:
+      # - authorization-service
+      - content-service
+      # - jisho-service
+      - login-service
 
 volumes:
   postgres_data:
