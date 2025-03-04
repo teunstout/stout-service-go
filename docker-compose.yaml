@@ -19,15 +19,15 @@ services:
   #   depends_on:
   #     - postgres
   #   environment:
-  #     CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+  #     CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
 
-  content-service:
-    build: ./content-service
-    container_name: content_service
-    depends_on:
-      - postgres
-    environment:
-      CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+  # content-service:
+  #   build: ./content-service
+  #   container_name: content_service
+  #   depends_on:
+  #     - postgres
+  #   environment:
+  #     CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
 
   # jisho-service:
   #   build: ./jisho-service
@@ -35,7 +35,7 @@ services:
   #   depends_on:
   #     - postgres
   #   environment:
-  #     CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+  #     CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
 
   login-service:
     build: ./login-service
@@ -43,18 +43,18 @@ services:
     depends_on:
       - postgres
     environment:
-      CONNECTION_STRING: 'user=golang password=golang host=http://postgres port=5432 dbname=development sslmode=disable'
+      CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
 
-  nginx:
-    image: ./nginx
-    container_name: nginx
-    ports:
-      - "8080:8080"
-    depends_on:
-      # - authorization-service
-      - content-service
-      # - jisho-service
-      - login-service
+  # nginx:
+  #   image: ./nginx
+  #   container_name: nginx
+  #   ports:
+  #     - "8080:8080"
+  #   depends_on:
+  #     # - authorization-service
+  #     - content-service
+  #     # - jisho-service
+  #     - login-service
 
 volumes:
   postgres_data:
