@@ -8,6 +8,8 @@ RUN go build -o authorization-service
 
 FROM golang:1.24
 
+EXPOSE 9096
+
 WORKDIR /app
 COPY --from=builder /build/authorization-service .
 

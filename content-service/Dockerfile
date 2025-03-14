@@ -8,6 +8,8 @@ RUN go build -o content-service
 
 FROM golang:1.24
 
+EXPOSE 8080
+
 WORKDIR /app
 COPY --from=builder /build/content-service .
 COPY --from=builder /build/internal/app/assets ./assets

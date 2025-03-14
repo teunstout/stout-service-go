@@ -8,6 +8,8 @@ RUN go build -o login-service
 
 FROM golang:1.24
 
+EXPOSE 8080
+
 RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
