@@ -1,4 +1,4 @@
-package postgres
+package database
 
 import (
 	"context"
@@ -17,8 +17,20 @@ func Connect() (*pgx.Conn, error) {
 	}
 
 	conn, err := pgx.Connect(context.Background(), connString)
+
 	if err != nil {
 		return nil, fmt.Errorf("unable to connect to database: %v", err)
 	}
 	return conn, nil
+}
+
+func CreateAccount(conn *pgx.Conn, username, password string) error {
+	_, err := conn.Exec(context.Background(), `
+		INSERT INTO accounts (username, password)
+		VALUES ($1, $2)
+	`, username, password)
+	if err != nil {
+		return fmt.Errorf("unable to create login: %v", err)
+	}
+	return nil
 }

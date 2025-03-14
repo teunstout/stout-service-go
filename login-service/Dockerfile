@@ -1,25 +1,21 @@
-FROM golang:1.24
+FROM golang:1.24 AS builder
 
-# Build the app
-COPY . /build
 WORKDIR /build
-RUN go install
+
+COPY . .
+RUN go mod download
 RUN go build -o login-service
 
-# Create the /app directory
-RUN mkdir -p /app
+FROM golang:1.24
 
-# Copy the built application to the /app directory
-RUN cp /build/login-service /app/login-service
-
-# Remove the build directory
-RUN rm -rf /build
+RUN apt-get update && apt-get install -y openssl && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /app
+COPY --from=builder /build/login-service .
 
-# Generate the RSA keys
-RUN openssl genrsa -out app.rsa 3072
-RUN openssl rsa -in app.rsa -pubout > app.rsa.pub
+RUN openssl genrsa -out app.rsa 3072 && \
+    openssl rsa -in app.rsa -pubout > app.rsa.pub && \
+    chown 1000:1000 app.rsa app.rsa.pub
 
 USER 1000:1000
 

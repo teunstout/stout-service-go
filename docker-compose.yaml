@@ -1,4 +1,4 @@
-version: '3.9'
+version: "3.9"
 
 services:
   postgres:
@@ -7,54 +7,65 @@ services:
     environment:
       POSTGRES_USER: golang
       POSTGRES_PASSWORD: golang
-      POSTGRES_DB: development
+      POSTGRES_DB: production
     ports:
       - "5432:5432"
     volumes:
       - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U golang"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
 
-  # authorization-service:
-  #   build: ./authorization-service
-  #   container_name: authorization_service
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
+  authorization-service:
+    build: ./authorization-service
+    container_name: authorization_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
 
-  # content-service:
-  #   build: ./content-service
-  #   container_name: content_service
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
+  content-service:
+    build: ./content-service
+    container_name: content_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
 
-  # jisho-service:
-  #   build: ./jisho-service
-  #   container_name: jisho_service
-  #   depends_on:
-  #     - postgres
-  #   environment:
-  #     CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
+  jisho-service:
+    build: ./jisho-service
+    container_name: jisho_service
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
 
   login-service:
     build: ./login-service
     container_name: login_service
     depends_on:
-      - postgres
+       postgres:
+        condition: service_healthy
     environment:
-      CONNECTION_STRING: 'user=golang password=golang host=postgres port=5432 dbname=development sslmode=disable'
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
 
-  # nginx:
-  #   image: ./nginx
-  #   container_name: nginx
-  #   ports:
-  #     - "8080:8080"
-  #   depends_on:
-  #     # - authorization-service
-  #     - content-service
-  #     # - jisho-service
-  #     - login-service
+  nginx:
+    build: ./nginx
+    container_name: nginx
+    depends_on:
+      - authorization-service
+      - content-service
+      - jisho-service
+      - login-service
+    ports:
+      - "8080:8080"
 
 volumes:
   postgres_data:

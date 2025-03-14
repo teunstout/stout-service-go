@@ -31,9 +31,6 @@ func NewApp() {
 	fatal(err)
 	defer conn.Close(context.Background())
 
-	err = postgres.InitDatabase(conn)
-	fatal(err)
-
 	signBytes, err := os.ReadFile(privKeyPath)
 	fatal(err)
 

@@ -2,7 +2,6 @@ package postgres
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"github.com/jackc/pgx/v4"
@@ -14,20 +13,6 @@ type Account struct {
 	Password  string
 	CreatedAt time.Time
 	UpdatedAt time.Time
-}
-
-func createAccountsTable(conn *pgx.Conn) error {
-	fmt.Println("Creating accounts table")
-	_, err := conn.Exec(context.Background(), `
-		CREATE TABLE IF NOT EXISTS accounts (
-			id SERIAL PRIMARY KEY,
-			username TEXT NOT NULL UNIQUE,
-			password TEXT NOT NULL,
-			created_at TIMESTAMP NOT NULL DEFAULT NOW(),
-			updated_at TIMESTAMP NOT NULL DEFAULT NOW()
-		)
-	`)
-	return err
 }
 
 func AccountExists(conn *pgx.Conn, username string) (bool, error) {

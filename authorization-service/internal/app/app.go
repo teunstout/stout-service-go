@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"context"
@@ -15,22 +15,17 @@ import (
 	"github.com/jackc/pgx/v4"
 	pg "github.com/vgarvardt/go-oauth2-pg/v4"
 	"github.com/vgarvardt/go-pg-adapter/pgx4adapter"
-	"stout.dev/authorization/database"
-	"stout.dev/authorization/login"
+	v1 "stout.dev/authorization/internal/app/v1"
+	"stout.dev/authorization/internal/pkg/database"
 )
 
-func main() {
+func NewApp() {
 	conn, err := database.Connect()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Unable to connect to database: %v\n", err)
 		os.Exit(1)
 	}
 	defer conn.Close(context.Background())
-
-	if err = database.CreateTables(conn); err != nil {
-		fmt.Fprintf(os.Stderr, "Unable to create tables: %v\n", err)
-		os.Exit(1)
-	}
 
 	adapter := pgx4adapter.NewConn(conn)
 
@@ -106,7 +101,7 @@ func userAuthorizeHandler(conn *pgx.Conn, w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	userID, err = login.AuthenticateUser(conn, username, password)
+	userID, err = v1.AuthenticateUser(conn, username, password)
 	if err != nil {
 		http.Error(w, "Invalid credentials", http.StatusUnauthorized)
 		return

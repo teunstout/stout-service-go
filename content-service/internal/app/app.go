@@ -1,4 +1,4 @@
-package main
+package app
 
 import (
 	"fmt"
@@ -10,7 +10,7 @@ import (
 
 const CV_PATH = "./assets/Teun-Johán-Stout.pdf"
 
-func main() {
+func NewApp() {
 	http.HandleFunc("/v1/content/cv", handleDownloadCv)
 
 	log.Println("Started on http://localhost:8080")

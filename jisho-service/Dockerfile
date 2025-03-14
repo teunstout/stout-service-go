@@ -1,8 +1,16 @@
-FROM debian:bookworm
+FROM golang:1.24 AS builder
+
+WORKDIR /build
+
+COPY . .
+RUN go mod download
+RUN go build -o jisho-service
+
+FROM golang:1.24
 
 WORKDIR /app
+COPY --from=builder /build/jisho-service .
 
-COPY --chown=1000:1000 ./jisho /app/jisho
 USER 1000:1000
 
-CMD ["./jisho"]
+CMD ["./jisho-service"]
