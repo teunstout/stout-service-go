@@ -1,6 +1,7 @@
 package v1
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"time"
@@ -96,8 +97,16 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 		return
 	}
 
-	username := r.FormValue("username")
-	password := r.FormValue("password")
+	var loginData LoginV1
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&loginData); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	username := loginData.Username
+	password := loginData.Password
 
 	if username == "" || password == "" {
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
@@ -160,8 +169,16 @@ func HandleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 		return
 	}
 
-	username := r.FormValue("username")
-	password := r.FormValue("password")
+	var loginData LoginV1
+
+	// Decode the JSON body
+	if err := json.NewDecoder(r.Body).Decode(&loginData); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	username := loginData.Username
+	password := loginData.Password
 
 	if username == "" || password == "" {
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
