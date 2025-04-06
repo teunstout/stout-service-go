@@ -1,21 +1,14 @@
 package v1
 
 import (
+	"crypto/rsa"
 	"encoding/json"
 	"log"
 	"net/http"
-	"time"
 
 	"github.com/jackc/pgx/v4"
 	"stout.dev/login/internal/pkg/postgres"
 	"stout.dev/login/internal/pkg/security"
-)
-
-const (
-	internalServerErrorMessage = "Minion broke the banana machine not working"
-	methodNotAllowedMessage    = "Minion not allowed"
-	statusUnauthorizedMessage  = "Minion is unauthorized"
-	statusForbiddenMessage     = "Minion tried something naughty"
 )
 
 type LoginV1 struct {
@@ -25,38 +18,38 @@ type LoginV1 struct {
 
 func HandleLogout(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	if r.Method != http.MethodGet {
-		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
+		http.Error(w, security.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
 	sessionToken, err := r.Cookie("session_token")
 	if err != nil {
-		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		http.Error(w, security.ForbiddenMessage, http.StatusForbidden)
 		return
 	}
 
 	csrfToken := r.Header.Get("x-csrf-token")
 	if csrfToken == "" {
-		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		http.Error(w, security.ForbiddenMessage, http.StatusForbidden)
 		return
 	}
 
 	accountID, err := postgres.GetAccountIdBySessionToken(conn, sessionToken.Value)
 	if err != nil {
 		log.Printf("Error getting account id: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	csrfAccountID, err := postgres.GetCsrfIdBySessionToken(conn, csrfToken)
 	if err != nil {
 		log.Printf("Error getting csrf account id: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	if accountID != csrfAccountID {
-		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		http.Error(w, security.ForbiddenMessage, http.StatusForbidden)
 		return
 	}
 
@@ -64,25 +57,25 @@ func HandleLogout(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	if logoutAllDevices {
 		if err := postgres.DeleteCsrfTokensByAccountId(conn, accountID); err != nil {
 			log.Printf("Error deleting csrf tokens: %v", err)
-			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 			return
 		}
 
 		if err := postgres.DeleteSessionTokensByAccountId(conn, accountID); err != nil {
 			log.Printf("Error deleting session tokens: %v", err)
-			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 			return
 		}
 	} else {
 		if err := postgres.DeleteCsrfToken(conn, csrfToken); err != nil {
 			log.Printf("Error deleting csrf token: %v", err)
-			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 			return
 		}
 
 		if err := postgres.DeleteSessionToken(conn, sessionToken.Value); err != nil {
 			log.Printf("Error deleting session token: %v", err)
-			http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+			http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 			return
 		}
 	}
@@ -91,9 +84,9 @@ func HandleLogout(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	w.Write([]byte("Minion logged out successfully"))
 }
 
-func HandleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+func HandleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn, signKey *rsa.PrivateKey) {
 	if r.Method != http.MethodPost {
-		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
+		http.Error(w, security.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -116,56 +109,23 @@ func HandleLogin(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	account, err := postgres.GetAccount(conn, username)
 	if err != nil {
 		log.Printf("Error getting password: %v", err)
-		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
+		http.Error(w, security.UnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
-	if passed := security.CheckPasswordHash(password, account.Password); !passed {
-		log.Printf("Error checking password: %v", err)
-		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
+	shouldReturn := security.CreateSession(password, account, err, w, conn)
+	if shouldReturn {
 		return
 	}
 
-	sessionToken := security.GenerateSecureToken()
-	tokenExpiration := time.Now().Add(time.Hour * 1) // 1 hours
-
-	if err = postgres.CreateSessionToken(conn, sessionToken, account.ID, tokenExpiration); err != nil {
-		log.Printf("Error creating session token: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
-		return
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    sessionToken,
-		Path:     "/",
-		Expires:  tokenExpiration,
-		HttpOnly: true,
-	})
-
-	csrfToken := security.GenerateSecureToken()
-
-	if err = postgres.CreateCsrfToken(conn, csrfToken, account.ID, tokenExpiration); err != nil {
-		log.Printf("Error creating csrf token: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
-		return
-	}
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "csrf_token",
-		Value:    csrfToken,
-		Path:     "/",
-		Expires:  tokenExpiration,
-		HttpOnly: false,
-	})
+	security.CreateJwt(w, r, account.ID, signKey)
 
 	w.WriteHeader(http.StatusOK)
-	w.Write([]byte("Minion logged in successfully"))
 }
 
 func HandleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	if r.Method != http.MethodPost {
-		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
+		http.Error(w, security.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
@@ -200,13 +160,13 @@ func HandleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	hashedPassword, err := security.HashPassword(password)
 	if err != nil {
 		log.Printf("Error hashing password: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	if err = postgres.CreateAccount(conn, username, hashedPassword); err != nil {
 		log.Printf("Error creating account: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
@@ -216,38 +176,38 @@ func HandleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 
 func HandleAuthenticate(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	if r.Method != http.MethodGet {
-		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
+		http.Error(w, security.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
 	sessionToken, err := r.Cookie("session_token")
 	if err != nil {
-		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
+		http.Error(w, security.UnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
 	csrfToken := r.Header.Get("x-csrf-token")
 	if csrfToken == "" {
-		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
+		http.Error(w, security.UnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
 	accountID, err := postgres.GetAccountIdBySessionToken(conn, sessionToken.Value)
 	if err != nil {
 		log.Printf("Error getting account id: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	csrfAccountID, err := postgres.GetCsrfIdBySessionToken(conn, csrfToken)
 	if err != nil {
 		log.Printf("Error getting csrf account id: %v", err)
-		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		http.Error(w, security.InternalServerErrorMessage, http.StatusInternalServerError)
 		return
 	}
 
 	if accountID != csrfAccountID {
-		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		http.Error(w, security.ForbiddenMessage, http.StatusForbidden)
 		return
 	}
 

@@ -48,7 +48,7 @@ func NewApp() {
 	})
 
 	http.HandleFunc("/v1/login", func(w http.ResponseWriter, r *http.Request) {
-		v1.HandleLogin(w, r, conn)
+		v1.HandleLogin(w, r, conn, signKey)
 	})
 
 	http.HandleFunc("/v1/logout", func(w http.ResponseWriter, r *http.Request) {
@@ -60,7 +60,7 @@ func NewApp() {
 	})
 
 	http.HandleFunc("/v1/jwt", func(w http.ResponseWriter, r *http.Request) {
-		security.CreateJwt(w, r, signKey)
+		security.CreateJwt(w, r, 1234, signKey)
 	})
 
 	http.HandleFunc("/v1/endpoints/restricted", restrictedHandler)
