@@ -56,7 +56,7 @@ func NewApp() {
 	})
 
 	http.HandleFunc("/v1/authenticate", func(w http.ResponseWriter, r *http.Request) {
-		// handleAuthenticate(w, r, conn)
+		v1.HandleAuthenticate(w, r, conn)
 	})
 
 	http.HandleFunc("/v1/jwt", func(w http.ResponseWriter, r *http.Request) {

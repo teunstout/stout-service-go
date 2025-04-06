@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v4"
 )
 
-const DATABASE_URL = "user=golang password=golang host=http://raspberrypi.local port=5432 dbname=production sslmode=disable"
+const DATABASE_URL = "user=golang password=golang host=raspberrypi.local port=5432 dbname=production sslmode=disable"
 
 func Connect() (*pgx.Conn, error) {
 	connString := os.Getenv("CONNECTION_STRING")

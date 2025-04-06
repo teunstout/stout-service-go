@@ -2,10 +2,11 @@ package v1
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 )
 
-func HandleJishoReponse(w http.ResponseWriter, r *http.Request) {
+func HandleJishoResponse(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		w.WriteHeader(http.StatusMethodNotAllowed)
 		return
@@ -26,9 +27,11 @@ func HandleJishoReponse(w http.ResponseWriter, r *http.Request) {
 	var response JishoResponse
 	err = json.NewDecoder(jr.Body).Decode(&response)
 	if err != nil {
+		log.Print(err)
 		w.WriteHeader(http.StatusInternalServerError)
 		return
 	}
+	defer jr.Body.Close()
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

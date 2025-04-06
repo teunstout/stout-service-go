@@ -1,5 +1,7 @@
 package v1
 
+import "encoding/json"
+
 type JishoResponse struct {
 	Metadata JishoStatusResponse `json:"meta"`
 	Data     []JishoData         `json:"data"`
@@ -25,19 +27,19 @@ type Japanese struct {
 }
 
 type Sense struct {
-	EnglishDefinitions []string `json:"english_definitions"`
-	PartsOfSpeech      []string `json:"parts_of_speech"`
-	Links              []string `json:"links"`
-	Tags               []string `json:"tags"`
-	Restrictions       []string `json:"restrictions"`
-	SeeAlso            []string `json:"see_also"`
-	Antonyms           []string `json:"antonyms"`
-	Source             []string `json:"source"`
-	Info               []string `json:"info"`
+	EnglishDefinitions []string        `json:"english_definitions"`
+	PartsOfSpeech      []string        `json:"parts_of_speech"`
+	Links              json.RawMessage `json:"links"`
+	Tags               []string        `json:"tags"`
+	Restrictions       []string        `json:"restrictions"`
+	SeeAlso            []string        `json:"see_also"`
+	Antonyms           []string        `json:"antonyms"`
+	Source             []string        `json:"source"`
+	Info               []string        `json:"info"`
 }
 
 type Attribution struct {
-	JMDict   bool `json:"jmdict"`
-	JMNedict bool `json:"jmnedict"`
-	DBPedia  bool `json:"dbpedia"`
+	JMDict   bool            `json:"jmdict"`
+	JMNedict bool            `json:"jmnedict"`
+	DBPedia  json.RawMessage `json:"dbpedia"`
 }

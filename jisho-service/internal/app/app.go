@@ -8,10 +8,13 @@ import (
 )
 
 func NewApp() {
-	http.HandleFunc("/v1/search", v1.HandleJishoReponse)
+	mux := http.NewServeMux()
 
-	log.Println("Server running on port 8080")
-	http.ListenAndServe(":8080", nil)
+	// Handlers
+	mux.HandleFunc("/v1/search", v1.HandleJishoResponse)
+
+	log.Println("Server starting on :8080...")
+	log.Fatal(http.ListenAndServe(":8080", mux))
 }
 
 func fatal(err error) {

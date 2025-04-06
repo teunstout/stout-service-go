@@ -3,6 +3,7 @@ package security
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"log"
 
 	"golang.org/x/crypto/bcrypt"
 )
@@ -14,6 +15,9 @@ func HashPassword(password string) (string, error) {
 
 func CheckPasswordHash(password string, hashedPassword string) bool {
 	err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(password))
+	if err != nil {
+		log.Println(err)
+	}
 	return err == nil
 }
 

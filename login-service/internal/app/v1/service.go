@@ -213,3 +213,44 @@ func HandleRegister(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Minion registered successfully"))
 }
+
+func HandleAuthenticate(w http.ResponseWriter, r *http.Request, conn *pgx.Conn) {
+	if r.Method != http.MethodGet {
+		http.Error(w, methodNotAllowedMessage, http.StatusMethodNotAllowed)
+		return
+	}
+
+	sessionToken, err := r.Cookie("session_token")
+	if err != nil {
+		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
+		return
+	}
+
+	csrfToken := r.Header.Get("x-csrf-token")
+	if csrfToken == "" {
+		http.Error(w, statusUnauthorizedMessage, http.StatusUnauthorized)
+		return
+	}
+
+	accountID, err := postgres.GetAccountIdBySessionToken(conn, sessionToken.Value)
+	if err != nil {
+		log.Printf("Error getting account id: %v", err)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		return
+	}
+
+	csrfAccountID, err := postgres.GetCsrfIdBySessionToken(conn, csrfToken)
+	if err != nil {
+		log.Printf("Error getting csrf account id: %v", err)
+		http.Error(w, internalServerErrorMessage, http.StatusInternalServerError)
+		return
+	}
+
+	if accountID != csrfAccountID {
+		http.Error(w, statusForbiddenMessage, http.StatusForbidden)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write([]byte("Minion is logged in"))
+}
