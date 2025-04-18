@@ -13,6 +13,7 @@ EXPOSE 8080
 WORKDIR /app
 COPY --from=builder /build/jisho-service .
 
+# Ensure the keys are accessible in the container
 USER 1000:1000
 
 CMD ["./jisho-service"]

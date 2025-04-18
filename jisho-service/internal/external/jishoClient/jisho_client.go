@@ -11,7 +11,7 @@ type JishoClientInterface struct {
 	logger domain.Logger
 }
 
-func JishoUsecase(l domain.Logger) *JishoClientInterface {
+func NewJishoUsecase(l domain.Logger) *JishoClientInterface {
 	return &JishoClientInterface{logger: l}
 }
 

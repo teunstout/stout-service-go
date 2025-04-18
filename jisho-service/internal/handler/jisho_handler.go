@@ -31,7 +31,7 @@ func (h *JishoHandlerInterface) SearchJisho(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	res, _ := h.usecase.SearchJisho(kw)
+	res, _ := h.usecase.SearchJisho(kw, r.Context())
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)

@@ -15,11 +15,6 @@ import (
 	"stout.dev/login/internal/pkg/security"
 )
 
-const (
-	privKeyPath = "app.rsa"     // openssl genrsa -out app.rsa 3072
-	pubKeyPath  = "app.rsa.pub" // openssl rsa -in app.rsa -pubout > app.rsa.pub
-)
-
 var (
 	verifyKey  *rsa.PublicKey
 	signKey    *rsa.PrivateKey
@@ -31,12 +26,22 @@ func NewApp() {
 	fatal(err)
 	defer conn.Close(context.Background())
 
+	privKeyPath := "/app/keys/app.rsa"
+	if _, err := os.Stat(privKeyPath); os.IsNotExist(err) {
+		fmt.Println("Private key not found, using default path")
+		privKeyPath = `C:\Users\Teuns\Documents\Github\stout-service-go\app.rsa`
+	}
 	signBytes, err := os.ReadFile(privKeyPath)
 	fatal(err)
 
 	signKey, err = jwt.ParseRSAPrivateKeyFromPEM(signBytes)
 	fatal(err)
 
+	pubKeyPath := "/app/keys/app.rsa.pub"
+	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
+		fmt.Println("Public key not found, using default path")
+		pubKeyPath = `C:\Users\Teuns\Documents\Github\stout-service-go\app.rsa.pub`
+	}
 	verifyBytes, err := os.ReadFile(pubKeyPath)
 	fatal(err)
 

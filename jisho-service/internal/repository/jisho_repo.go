@@ -1,25 +1,28 @@
-package postgres
+package repository
 
 import (
 	"context"
-	"fmt"
-	"os"
 
 	"github.com/jackc/pgx/v4"
+	"stout.dev/jisho/internal/domain"
 )
 
-const DATABASE_URL = "user=golang password=golang host=http://raspberrypi.local port=5432 dbname=production sslmode=disable"
+type JishoRepositoryInterface struct {
+	conn   *pgx.Conn
+	logger domain.Logger
+}
 
-func Connect() (*pgx.Conn, error) {
-	connString := os.Getenv("CONNECTION_STRING")
-	if connString == "" {
-		connString = DATABASE_URL
-	}
-
-	conn, err := pgx.Connect(context.Background(), connString)
-
+func NewJishoRepository(connString string, l domain.Logger) *JishoRepositoryInterface {
+	c, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
-		return nil, fmt.Errorf("unable to connect to database: %v", err)
+		l.Error("Unable to connect to database", map[string]interface{}{"error": err})
+		return nil
 	}
-	return conn, nil
+
+	return &JishoRepositoryInterface{conn: c, logger: l}
+}
+
+func (r *JishoRepositoryInterface) SaveSearchHistory(mid int32, keyword string) error {
+	r.logger.Info("Saving search history", map[string]interface{}{"mid": mid, "keyword": keyword})
+	return nil
 }
