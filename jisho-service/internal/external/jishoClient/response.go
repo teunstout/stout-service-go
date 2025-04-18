@@ -1,4 +1,4 @@
-package v1
+package jishoclient
 
 type JishoResponse struct {
 	Metadata JishoStatusResponse `json:"meta"`

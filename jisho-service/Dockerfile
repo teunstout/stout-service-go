@@ -4,7 +4,7 @@ WORKDIR /build
 
 COPY . .
 RUN go mod download
-RUN go build -o jisho-service
+RUN go build -o jisho-service ./cmd
 
 FROM golang:1.24
 
