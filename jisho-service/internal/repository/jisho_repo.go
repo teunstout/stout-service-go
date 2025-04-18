@@ -24,5 +24,15 @@ func NewJishoRepository(connString string, l domain.Logger) *JishoRepositoryInte
 
 func (r *JishoRepositoryInterface) SaveSearchHistory(mid int32, keyword string) error {
 	r.logger.Info("Saving search history", map[string]interface{}{"mid": mid, "keyword": keyword})
+
+	_, err := r.conn.Exec(context.Background(), `
+		INSERT INTO member_search_history(member_id, search_term)
+		VALUES ($1, $2, $3)
+	`, mid, keyword)
+
+	if err != nil {
+		r.logger.Error("Failed to save search history", map[string]interface{}{"mid": mid, "keyword": keyword, "error": err})
+	}
+
 	return nil
 }
