@@ -10,13 +10,12 @@ import (
 	logruslogger "stout.dev/jisho/internal/adapters/logger"
 	jishoclient "stout.dev/jisho/internal/external/jishoClient"
 	"stout.dev/jisho/internal/handler"
-	"stout.dev/jisho/internal/middleware"
 	"stout.dev/jisho/internal/repository"
 	"stout.dev/jisho/internal/usecase"
 )
 
 const (
-	DATABASE_URL = "user=golang password=golang host=http://raspberrypi.local port=5432 dbname=production sslmode=disable"
+	DATABASE_URL = "user=golang password=golang host=localhost port=5432 dbname=postgres sslmode=disable"
 )
 
 var (
@@ -35,7 +34,7 @@ func main() {
 	pubKeyPath := "/app/keys/app.rsa.pub"
 	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
 		logger.Warn("Public key not found, using default path", nil)
-		pubKeyPath = `C:\Users\Teuns\Documents\Github\stout-service-go\app.rsa.pub`
+		pubKeyPath = `../app.rsa.pub` // This is from the root of jisho-service
 	}
 
 	verifyBytes, err := os.ReadFile(pubKeyPath)
@@ -51,7 +50,8 @@ func main() {
 	jishoUsecase := usecase.NewJishoUsecase(jishoClient, jishoRepository, logger)
 	jishoHandler := handler.NewJishoHandler(jishoUsecase, logger)
 
-	mux.HandleFunc("/v1/search", middleware.AuthMiddleware(jishoHandler.SearchJisho, logger, verifyKey))
+	// mux.HandleFunc("/v1/search", middleware.AuthMiddleware(jishoHandler.SearchJisho, logger, verifyKey))
+	mux.HandleFunc("/v1/search", func(w http.ResponseWriter, r *http.Request) { jishoHandler.SearchJisho(w, r) })
 	http.ListenAndServe(":8080", mux)
 	logger.Info("Server ready and listening!", nil)
 }

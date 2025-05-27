@@ -2,7 +2,9 @@ package jishoclient
 
 import (
 	"encoding/json"
+	"fmt"
 	"net/http"
+	"net/url"
 
 	"stout.dev/jisho/internal/domain"
 )
@@ -16,18 +18,29 @@ func NewJishoUsecase(l domain.Logger) *JishoClientInterface {
 }
 
 func (c *JishoClientInterface) SearchJisho(keyword string) (*JishoResponse, error) {
-	jr, err := http.Get("https://jisho.org/api/v1/search/words?keyword=" + keyword)
-	if err == nil {
-		c.logger.Error("Failed to make request to Jisho API", map[string]interface{}{"error": err})
+	uri := fmt.Sprintf("http://jisho.org/api/v1/search/words?keyword=%s", url.QueryEscape(keyword))
+	jr, err := http.Get(uri)
+
+	if err != nil {
+		c.logger.Error("Failed to make request to Jisho API", map[string]interface{}{
+			"uri":   uri,
+			"error": err,
+		})
 		return nil, err
 	}
 	defer jr.Body.Close()
 
-	var response JishoResponse
-	err = json.NewDecoder(jr.Body).Decode(&response)
+	response := &JishoResponse{}
+	err = json.NewDecoder(jr.Body).Decode(response)
+
 	if err != nil {
-		c.logger.Warn("Failed to decode Jisho API response", map[string]interface{}{"error": err})
+		c.logger.Warn("Failed to decode Jisho API response", map[string]interface{}{
+			"uri":    uri,
+			"error":  err,
+			"status": jr.StatusCode,
+		})
 		return nil, err
 	}
-	return &response, nil
+
+	return response, nil
 }

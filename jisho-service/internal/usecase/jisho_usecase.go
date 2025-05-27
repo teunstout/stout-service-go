@@ -19,13 +19,13 @@ func NewJishoUsecase(c *jishoclient.JishoClientInterface, r *repository.JishoRep
 }
 
 func (u *JishoUsecaseInterface) SearchJisho(keyword string, ctx context.Context) (*jishoclient.JishoResponse, error) {
-	response, err := u.client.SearchJisho(keyword)
-
 	u.saveSearchHistory(keyword, ctx)
+	response, err := u.client.SearchJisho(keyword)
 
 	if err != nil {
 		return nil, err
 	}
+
 	return response, nil
 }
 

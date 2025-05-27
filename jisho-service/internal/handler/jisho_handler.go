@@ -26,12 +26,16 @@ func (h *JishoHandlerInterface) SearchJisho(w http.ResponseWriter, r *http.Reque
 
 	kw := r.URL.Query().Get("keyword")
 	if kw == "" {
-		h.logger.Debug("Keyword is empty", map[string]interface{}{"keyword": kw})
+		h.logger.Info("Keyword is empty", map[string]interface{}{"keyword": kw})
 		w.WriteHeader(http.StatusBadRequest)
 		return
 	}
 
-	res, _ := h.usecase.SearchJisho(kw, r.Context())
+	res, err := h.usecase.SearchJisho(kw, r.Context())
+
+	if err != nil {
+		h.logger.Info("Successfully fetched data from Jisho API", map[string]interface{}{"keyword": kw, "results": res})
+	}
 
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
