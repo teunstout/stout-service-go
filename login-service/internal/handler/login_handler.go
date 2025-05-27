@@ -1,0 +1,80 @@
+package handler
+
+import (
+	"encoding/json"
+
+	"net/http"
+	"time"
+
+	"stout.dev/login/internal/domain"
+	"stout.dev/login/internal/usecase"
+)
+
+type LoginHandlerInterface struct {
+	logger  domain.Logger
+	usecase *usecase.LoginUsecaseInterface
+}
+
+func NewLoginHandler(usecase *usecase.LoginUsecaseInterface, logger domain.Logger) *LoginHandlerInterface {
+	return &LoginHandlerInterface{
+		usecase: usecase,
+		logger:  logger,
+	}
+}
+
+func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		http.Error(w, domain.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
+		return
+	}
+
+	var loginData domain.LoginBody
+	if err := json.NewDecoder(r.Body).Decode(&loginData); err != nil {
+		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		return
+	}
+
+	if loginData.Username == "" || loginData.Password == "" {
+		h.logger.Debug("Invalid login attempt", map[string]interface{}{
+			"username": loginData.Username,
+			"password": loginData.Password,
+		})
+		http.Error(w, "Username and password are required", http.StatusBadRequest)
+		return
+	}
+
+	session, csrf, jwt, err := h.usecase.Login(loginData.Username, loginData.Password)
+	if err != nil {
+		http.Error(w, domain.UnauthorizedMessage, http.StatusUnauthorized)
+		return
+	}
+
+	exprDate := time.Now().Add(24 * time.Hour)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "JWT",
+		Value:    jwt,
+		Path:     "/",
+		HttpOnly: false,
+		Secure:   true,
+		SameSite: http.SameSiteStrictMode,
+		Expires:  exprDate,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "csrf_token",
+		Value:    csrf.Value,
+		Path:     "/",
+		Expires:  exprDate,
+		HttpOnly: false,
+	})
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    session.Value,
+		Path:     "/",
+		Expires:  exprDate,
+		HttpOnly: true,
+	})
+
+	w.WriteHeader(http.StatusOK)
+}

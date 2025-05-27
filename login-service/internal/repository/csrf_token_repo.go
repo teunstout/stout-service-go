@@ -1,0 +1,57 @@
+package repository
+
+import (
+	"context"
+	"time"
+
+	"github.com/jackc/pgx/v4"
+	"stout.dev/login/internal/domain"
+)
+
+type CsrfRepositoryInterface struct {
+	conn   *pgx.Conn
+	logger domain.Logger
+}
+
+func NewCsrfRepository(connString string, l domain.Logger) *CsrfRepositoryInterface {
+	conn, err := pgx.Connect(context.Background(), connString)
+	if err != nil {
+		l.Error("Unable to connect to database", map[string]interface{}{"error": err})
+		return nil
+	}
+
+	return &CsrfRepositoryInterface{
+		conn:   conn,
+		logger: l,
+	}
+}
+
+func (r *CsrfRepositoryInterface) CreateCsrfToken(token string, accountID int32, expiresAt time.Time) error {
+	_, err := r.conn.Exec(context.Background(), `
+		INSERT INTO csrf_tokens (token, account_id, expires_at)
+		VALUES ($1, $2, $3)
+	`, token, accountID, expiresAt)
+	return err
+}
+
+func (r *CsrfRepositoryInterface) GetCsrfIdBySessionToken(token string) (int32, error) {
+	var accountID int32
+	err := r.conn.QueryRow(context.Background(), `
+		SELECT account_id FROM csrf_tokens WHERE token = $1
+	`, token).Scan(&accountID)
+	return accountID, err
+}
+
+func (r *CsrfRepositoryInterface) DeleteCsrfTokensByAccountId(accountID int32) error {
+	_, err := r.conn.Exec(context.Background(), `
+		DELETE FROM csrf_tokens WHERE account_id = $1
+	`, accountID)
+	return err
+}
+
+func (r *CsrfRepositoryInterface) DeleteCsrfToken(token string) error {
+	_, err := r.conn.Exec(context.Background(), `
+		DELETE FROM csrf_tokens WHERE token = $1
+	`, token)
+	return err
+}

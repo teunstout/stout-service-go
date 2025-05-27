@@ -4,7 +4,7 @@ WORKDIR /build
 
 COPY . .
 RUN go mod download
-RUN go build -o login-service
+RUN go build -o login-service ./cmd
 
 FROM golang:1.24
 
