@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rsa"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -33,7 +32,7 @@ func main() {
 
 	privKeyPath := "/app/keys/app.rsa"
 	if _, err := os.Stat(privKeyPath); os.IsNotExist(err) {
-		fmt.Println("Private key not found, using default path")
+		logger.Info("Private key not found, using default path", map[string]interface{}{})
 		privKeyPath = "../app.rsa"
 	}
 
@@ -45,7 +44,7 @@ func main() {
 
 	pubKeyPath := "/app/keys/app.rsa.pub"
 	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
-		fmt.Println("Public key not found, using default path")
+		logger.Info("Public key not found, using default path", map[string]interface{}{})
 		pubKeyPath = "../app.rsa.pub"
 	}
 

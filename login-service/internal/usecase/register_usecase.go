@@ -2,7 +2,7 @@ package usecase
 
 import (
 	"crypto/rsa"
-	"fmt"
+	"errors"
 
 	"stout.dev/login/internal/domain"
 	"stout.dev/login/internal/repository"
@@ -32,7 +32,7 @@ func (u *RegisterUsecaseInterface) Register(username string, password string) er
 
 	if exists {
 		u.logger.Debug("Account already exists", map[string]interface{}{})
-		return fmt.Errorf("account already exists")
+		return errors.New("account already exists")
 	}
 
 	// Hash password
@@ -46,5 +46,6 @@ func (u *RegisterUsecaseInterface) Register(username string, password string) er
 		u.logger.Error("Error creating account", map[string]interface{}{"username": username, "error": err})
 		return err
 	}
+
 	return nil
 }

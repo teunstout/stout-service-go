@@ -43,6 +43,11 @@ func (h *RegisterHandlerInterface) HandleRegister(w http.ResponseWriter, r *http
 		return
 	}
 
+	if err := h.usecase.Register(username, password); err != nil {
+		w.WriteHeader(http.StatusForbidden)
+		w.Write([]byte(err.Error()))
+	}
+
 	w.WriteHeader(http.StatusCreated)
 	w.Write([]byte("Minion registered successfully"))
 }
