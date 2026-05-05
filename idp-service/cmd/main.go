@@ -2,6 +2,7 @@ package main
 
 import (
 	"crypto/rsa"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -25,9 +26,7 @@ func main() {
 	if env != "" {
 		logger, err = zap.NewProduction()
 	}
-	if err != nil {
-		log.Fatal(err)
-	}
+	fatal(err)
 	defer logger.Sync()
 
 	connString := os.Getenv("CONNECTION_STRING")
@@ -63,6 +62,7 @@ func main() {
 	sessionRepo := repository.NewSessionTokenRepository(connString, logger)
 	csrfRepo := repository.NewCsrfRepository(connString, logger)
 
+	fmt.Printf("DEBUG construct: sessionRepo=%p isNil=%v\n", sessionRepo, sessionRepo == nil)
 	authUsecase := usecase.NewAuthenticationUsecase(sessionRepo, csrfRepo, logger)
 	loginUsecase := usecase.NewLoginUsecase(accountRepo, sessionRepo, csrfRepo, logger, signKey)
 	registerUsecase := usecase.NewRegisterUsecase(accountRepo, logger, signKey)

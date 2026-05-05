@@ -25,12 +25,14 @@ func NewLoginHandler(usecase *usecase.LoginUsecaseInterface, logger *zap.Logger)
 
 func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
+		h.logger.Debug("Method not allowed", zap.String("method", r.Method))
 		http.Error(w, domain.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
 	var loginData domain.LoginBody
 	if err := json.NewDecoder(r.Body).Decode(&loginData); err != nil {
+		h.logger.Debug("Invalid JSON payload", zap.Error(err))
 		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
 		return
 	}
@@ -46,6 +48,7 @@ func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Reque
 
 	session, csrf, jwt, err := h.usecase.Login(loginData.Username, loginData.Password)
 	if err != nil {
+		h.logger.Info("Login failed", zap.String("username", loginData.Username))
 		http.Error(w, domain.UnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
