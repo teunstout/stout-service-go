@@ -14,14 +14,14 @@ CONNECTION_STRING="user=golang password=golang host=localhost port=5432 dbname=p
 
 #### Register
 ```bash
-curl -X POST http://localhost:8080/v1/register \
+curl -i -X POST http://localhost:8080/v1/register \
   -H "Content-Type: application/json" \
   -d '{"username":"golang","password":"golang"}'
 ```
 
 #### Login
 ```bash
-curl -X POST http://localhost:8080/v1/login \
+curl -i -X POST http://localhost:8080/v1/login \
   -H "Content-Type: application/json" \
   -d '{"username":"golang","password":"golang"}'
 ```
