@@ -7,17 +7,17 @@ import (
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/golang-jwt/jwt/v5/request"
-	"stout.dev/login/internal/domain"
-	"stout.dev/login/internal/usecase"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/usecase"
 )
 
 type RestrictedHandlerInterface struct {
-	logger    domain.Logger
+	logger    *zap.Logger
 	usecase   *usecase.AuthenticationUsecaseInterface
 	verifyKey *rsa.PublicKey
 }
 
-func NewRestrictedHandler(usecase *usecase.AuthenticationUsecaseInterface, logger domain.Logger, verifyKey *rsa.PublicKey) *RestrictedHandlerInterface {
+func NewRestrictedHandler(usecase *usecase.AuthenticationUsecaseInterface, logger *zap.Logger, verifyKey *rsa.PublicKey) *RestrictedHandlerInterface {
 	return &RestrictedHandlerInterface{
 		usecase:   usecase,
 		logger:    logger,

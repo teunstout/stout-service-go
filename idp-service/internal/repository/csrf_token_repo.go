@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"stout.dev/login/internal/domain"
+	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 type CsrfRepositoryInterface struct {
 	conn   *pgx.Conn
-	logger domain.Logger
+	logger *zap.Logger
 }
 
-func NewCsrfRepository(connString string, l domain.Logger) *CsrfRepositoryInterface {
+func NewCsrfRepository(connString string, l *zap.Logger) *CsrfRepositoryInterface {
 	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
-		l.Error("Unable to connect to database", map[string]interface{}{"error": err})
+		l.Error("Unable to connect to database", zap.Error(err))
 		return nil
 	}
 

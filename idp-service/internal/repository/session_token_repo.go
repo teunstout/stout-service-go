@@ -4,19 +4,19 @@ import (
 	"context"
 	"time"
 
-	"github.com/jackc/pgx/v4"
-	"stout.dev/login/internal/domain"
+	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
 )
 
 type SessionTokenRepositoryInterface struct {
 	conn   *pgx.Conn
-	logger domain.Logger
+	logger *zap.Logger
 }
 
-func NewSessionTokenRepository(connString string, l domain.Logger) *SessionTokenRepositoryInterface {
+func NewSessionTokenRepository(connString string, l *zap.Logger) *SessionTokenRepositoryInterface {
 	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
-		l.Error("Unable to connect to database", map[string]interface{}{"error": err})
+		l.Error("Unable to connect to database", zap.Error(err))
 		return nil
 	}
 

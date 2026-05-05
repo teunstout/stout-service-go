@@ -3,19 +3,20 @@ package repository
 import (
 	"context"
 
-	"github.com/jackc/pgx/v4"
-	"stout.dev/login/internal/domain"
+	"github.com/jackc/pgx/v5"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
 )
 
 type AccountRepositoryInterface struct {
 	conn   *pgx.Conn
-	logger domain.Logger
+	logger *zap.Logger
 }
 
-func NewAccountRepository(connString string, l domain.Logger) *AccountRepositoryInterface {
+func NewAccountRepository(connString string, l *zap.Logger) *AccountRepositoryInterface {
 	conn, err := pgx.Connect(context.Background(), connString)
 	if err != nil {
-		l.Error("Unable to connect to database", map[string]interface{}{"error": err})
+		l.Error("Unable to connect to database", zap.Error(err))
 		return nil
 	}
 

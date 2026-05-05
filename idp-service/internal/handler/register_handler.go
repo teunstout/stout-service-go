@@ -5,16 +5,17 @@ import (
 
 	"net/http"
 
-	"stout.dev/login/internal/domain"
-	"stout.dev/login/internal/usecase"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
+	"stout.dev/idp/internal/usecase"
 )
 
 type RegisterHandlerInterface struct {
-	logger  domain.Logger
+	logger  *zap.Logger
 	usecase *usecase.RegisterUsecaseInterface
 }
 
-func NewRegisterHandler(usecase *usecase.RegisterUsecaseInterface, logger domain.Logger) *RegisterHandlerInterface {
+func NewRegisterHandler(usecase *usecase.RegisterUsecaseInterface, logger *zap.Logger) *RegisterHandlerInterface {
 	return &RegisterHandlerInterface{
 		usecase: usecase,
 		logger:  logger,

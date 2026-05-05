@@ -7,14 +7,10 @@ import (
 	"os"
 
 	"github.com/golang-jwt/jwt/v5"
-	"stout.dev/login/internal/handler"
-	"stout.dev/login/internal/repository"
-	"stout.dev/login/internal/usecase"
-	logruslogger "stout.dev/login/pkg/logger"
-)
-
-const (
-	DATABASE_URL = "user=golang password=golang host=localhost port=5432 dbname=postgres sslmode=disable"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/handler"
+	"stout.dev/idp/internal/repository"
+	"stout.dev/idp/internal/usecase"
 )
 
 var (
@@ -24,16 +20,25 @@ var (
 )
 
 func main() {
-	logger := logruslogger.NewLogrusLogger()
+	env := os.Getenv("ENV")
+	logger, err := zap.NewDevelopment()
+	if env != "" {
+		logger, err = zap.NewProduction()
+	}
+	if err != nil {
+		log.Fatal(err)
+	}
+	defer logger.Sync()
+
 	connString := os.Getenv("CONNECTION_STRING")
 	if connString == "" {
-		connString = DATABASE_URL
+		log.Fatal("CONNECTION_STRING environment variable not set")
 	}
 
 	privKeyPath := "/app/keys/app.rsa"
 	if _, err := os.Stat(privKeyPath); os.IsNotExist(err) {
-		logger.Info("Private key not found, using default path", map[string]interface{}{})
 		privKeyPath = "../app.rsa"
+		logger.Info("Private key not found, using default path: " + privKeyPath)
 	}
 
 	signBytes, err := os.ReadFile(privKeyPath)
@@ -44,8 +49,8 @@ func main() {
 
 	pubKeyPath := "/app/keys/app.rsa.pub"
 	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
-		logger.Info("Public key not found, using default path", map[string]interface{}{})
 		pubKeyPath = "../app.rsa.pub"
+		logger.Info("Public key not found, using default path: " + pubKeyPath)
 	}
 
 	verifyBytes, err := os.ReadFile(pubKeyPath)

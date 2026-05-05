@@ -3,16 +3,17 @@ package handler
 import (
 	"net/http"
 
-	"stout.dev/login/internal/domain"
-	"stout.dev/login/internal/usecase"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
+	"stout.dev/idp/internal/usecase"
 )
 
 type AuthenticateHandlerInterface struct {
-	logger  domain.Logger
+	logger  *zap.Logger
 	usecase *usecase.AuthenticationUsecaseInterface
 }
 
-func NewAuthenticateHandler(usecase *usecase.AuthenticationUsecaseInterface, logger domain.Logger) *AuthenticateHandlerInterface {
+func NewAuthenticateHandler(usecase *usecase.AuthenticationUsecaseInterface, logger *zap.Logger) *AuthenticateHandlerInterface {
 	return &AuthenticateHandlerInterface{
 		usecase: usecase,
 		logger:  logger,
@@ -38,11 +39,11 @@ func (h *AuthenticateHandlerInterface) HandleAuthenticate(w http.ResponseWriter,
 	}
 
 	if err := h.usecase.Register(sessionToken.Value, csrfToken); err != nil {
-		h.logger.Error("Authentication failed", map[string]interface{}{
-			"sessionToken": sessionToken.Value,
-			"csrfToken":    csrfToken,
-			"error":        err,
-		})
+		h.logger.Error("Authentication failed",
+			zap.String("sessionToken", sessionToken.Value),
+			zap.String("csrfToken", csrfToken),
+			zap.Error(err),
+		)
 	}
 
 	w.WriteHeader(http.StatusOK)

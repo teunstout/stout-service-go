@@ -4,17 +4,18 @@ import (
 	"crypto/rsa"
 	"errors"
 
-	"stout.dev/login/internal/domain"
-	"stout.dev/login/internal/repository"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
+	"stout.dev/idp/internal/repository"
 )
 
 type RegisterUsecaseInterface struct {
 	accountRepo *repository.AccountRepositoryInterface
-	logger      domain.Logger
+	logger      *zap.Logger
 	privateKey  *rsa.PrivateKey
 }
 
-func NewRegisterUsecase(accountRepo *repository.AccountRepositoryInterface, logger domain.Logger, privateKey *rsa.PrivateKey) *RegisterUsecaseInterface {
+func NewRegisterUsecase(accountRepo *repository.AccountRepositoryInterface, logger *zap.Logger, privateKey *rsa.PrivateKey) *RegisterUsecaseInterface {
 	return &RegisterUsecaseInterface{
 		accountRepo: accountRepo,
 		logger:      logger,
@@ -26,24 +27,24 @@ func (u *RegisterUsecaseInterface) Register(username string, password string) er
 	exists, err := u.accountRepo.AccountExists(username)
 
 	if err != nil {
-		u.logger.Error("Error checking if account exists", map[string]interface{}{"username": username, "error": err})
+		u.logger.Error("Error checking if account exists", zap.String("username", username), zap.Error(err))
 		return err
 	}
 
 	if exists {
-		u.logger.Debug("Account already exists", map[string]interface{}{})
+		u.logger.Debug("Account already exists", zap.String("username", username))
 		return errors.New("account already exists")
 	}
 
 	// Hash password
 	hashedPassword, err := domain.HashPassword(password)
 	if err != nil {
-		u.logger.Error("Error hashing password", map[string]interface{}{"username": username, "error": err})
+		u.logger.Error("Error hashing password", zap.String("username", username), zap.Error(err))
 		return err
 	}
 
 	if err = u.accountRepo.CreateAccount(username, hashedPassword); err != nil {
-		u.logger.Error("Error creating account", map[string]interface{}{"username": username, "error": err})
+		u.logger.Error("Error creating account", zap.String("username", username), zap.Error(err))
 		return err
 	}
 

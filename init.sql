@@ -47,19 +47,9 @@ CREATE TABLE
         id SERIAL PRIMARY KEY,
         member_id INTEGER NOT NULL,
         search_term TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW (),
+        created_at TIMESTAMP NOT NULL DEFAULT NOW ()
     );
 
 
 CREATE INDEX IF NOT EXISTS idx_member_search_history_member_id ON member_search_history (member_id);
 CREATE INDEX IF NOT EXISTS idx_member_search_history_search_term ON member_search_history (search_term);
-
--- authorization-service.
-CREATE TABLE
-    IF NOT EXISTS accounts (
-        id SERIAL PRIMARY KEY,
-        username TEXT NOT NULL UNIQUE,
-        password TEXT NOT NULL,
-        created_at TIMESTAMP NOT NULL DEFAULT NOW (),
-        updated_at TIMESTAMP NOT NULL DEFAULT NOW ()
-    )

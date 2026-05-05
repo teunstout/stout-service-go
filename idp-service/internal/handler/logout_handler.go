@@ -3,16 +3,17 @@ package handler
 import (
 	"net/http"
 
-	"stout.dev/login/internal/domain"
-	"stout.dev/login/internal/usecase"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
+	"stout.dev/idp/internal/usecase"
 )
 
 type LogoutHandlerInterface struct {
-	logger  domain.Logger
+	logger  *zap.Logger
 	usecase *usecase.LogoutUsecaseInterface
 }
 
-func NewLogoutHandler(usecase *usecase.LogoutUsecaseInterface, logger domain.Logger) *LogoutHandlerInterface {
+func NewLogoutHandler(usecase *usecase.LogoutUsecaseInterface, logger *zap.Logger) *LogoutHandlerInterface {
 	return &LogoutHandlerInterface{
 		usecase: usecase,
 		logger:  logger,
@@ -21,21 +22,21 @@ func NewLogoutHandler(usecase *usecase.LogoutUsecaseInterface, logger domain.Log
 
 func (h *LogoutHandlerInterface) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		h.logger.Debug("Method not allowed", map[string]interface{}{})
+		h.logger.Debug("Method not allowed")
 		http.Error(w, domain.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
 		return
 	}
 
 	sessionToken, err := r.Cookie("session_token")
 	if err != nil {
-		h.logger.Info("Someone tried logging out without being logged in", map[string]interface{}{})
+		h.logger.Info("Someone tried logging out without being logged in")
 		http.Error(w, domain.ForbiddenMessage, http.StatusForbidden)
 		return
 	}
 
 	csrfToken := r.Header.Get("x-csrf-token")
 	if csrfToken == "" {
-		h.logger.Warn("Session token without x-csrf-token", map[string]interface{}{})
+		h.logger.Warn("Session token without x-csrf-token")
 		http.Error(w, domain.ForbiddenMessage, http.StatusForbidden)
 		return
 	}

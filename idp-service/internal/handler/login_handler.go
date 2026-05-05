@@ -6,16 +6,17 @@ import (
 	"net/http"
 	"time"
 
-	"stout.dev/login/internal/domain"
-	"stout.dev/login/internal/usecase"
+	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
+	"stout.dev/idp/internal/usecase"
 )
 
 type LoginHandlerInterface struct {
-	logger  domain.Logger
+	logger  *zap.Logger
 	usecase *usecase.LoginUsecaseInterface
 }
 
-func NewLoginHandler(usecase *usecase.LoginUsecaseInterface, logger domain.Logger) *LoginHandlerInterface {
+func NewLoginHandler(usecase *usecase.LoginUsecaseInterface, logger *zap.Logger) *LoginHandlerInterface {
 	return &LoginHandlerInterface{
 		usecase: usecase,
 		logger:  logger,
@@ -35,10 +36,10 @@ func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Reque
 	}
 
 	if loginData.Username == "" || loginData.Password == "" {
-		h.logger.Debug("Invalid login attempt", map[string]interface{}{
-			"username": loginData.Username,
-			"password": loginData.Password,
-		})
+		h.logger.Debug("Invalid login attempt",
+			zap.String("username", loginData.Username),
+			zap.String("password", loginData.Password),
+		)
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
 		return
 	}
