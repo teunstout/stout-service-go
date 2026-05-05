@@ -3,6 +3,8 @@
 ## Quickstart
 
 ```bash
+cd idp-service
+
 # Windows
 $env:CONNECTION_STRING="user=golang password=golang host=localhost port=5432 dbname=postgres sslmode=disable"; go run ./cmd/main.go
 

@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rsa"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -62,7 +61,6 @@ func main() {
 	sessionRepo := repository.NewSessionTokenRepository(connString, logger)
 	csrfRepo := repository.NewCsrfRepository(connString, logger)
 
-	fmt.Printf("DEBUG construct: sessionRepo=%p isNil=%v\n", sessionRepo, sessionRepo == nil)
 	authUsecase := usecase.NewAuthenticationUsecase(sessionRepo, csrfRepo, logger)
 	loginUsecase := usecase.NewLoginUsecase(accountRepo, sessionRepo, csrfRepo, logger, signKey)
 	registerUsecase := usecase.NewRegisterUsecase(accountRepo, logger, signKey)

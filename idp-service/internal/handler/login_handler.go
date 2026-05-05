@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 	"stout.dev/idp/internal/domain"
@@ -53,32 +52,7 @@ func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	exprDate := time.Now().Add(24 * time.Hour)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "JWT",
-		Value:    jwt,
-		Path:     "/",
-		HttpOnly: false,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  exprDate,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "csrf_token",
-		Value:    csrf.Value,
-		Path:     "/",
-		Expires:  exprDate,
-		HttpOnly: false,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    session.Value,
-		Path:     "/",
-		Expires:  exprDate,
-		HttpOnly: true,
-	})
-
+	jsonResponse, err := json.Marshal(map[string]string{"jwt": jwt, "csrfToken": csrf.Value, "sessionToken": session.Value})
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(jsonResponse))
 }
