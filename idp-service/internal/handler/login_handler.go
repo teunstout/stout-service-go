@@ -52,7 +52,13 @@ func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	jsonResponse, err := json.Marshal(map[string]string{"jwt": jwt, "csrfToken": csrf.Value, "sessionToken": session.Value})
+	body := map[string]string{"jwt": jwt, "csrfToken": csrf.Value, "sessionToken": session.Value}
+	jsonResponse, err := json.Marshal(body)
+	if err != nil {
+		h.logger.Info("Creating Json response failed", zap.Any("body", body))
+		http.Error(w, domain.InternalServerErrorMessage, http.StatusConflict)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte(jsonResponse))
 }

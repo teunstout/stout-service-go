@@ -38,7 +38,7 @@ services:
     volumes:
       - rsa_keys:/app/keys
 
-  login-service:
+  idp-server:
     build: idp-service
     container_name: login_service
     depends_on:
@@ -71,7 +71,7 @@ services:
     depends_on:
       - content-service
       - jisho-service
-      - login-service
+      - idp-server
     ports:
       - "8080:8080"
 

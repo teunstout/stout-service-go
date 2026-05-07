@@ -1,8 +1,8 @@
 package domain
 
 const (
-	InternalServerErrorMessage = "Minion broke the banana machine not working"
-	MethodNotAllowedMessage    = "Minion not allowed"
-	UnauthorizedMessage        = "Minion is unauthorized"
-	ForbiddenMessage           = "Minion tried something naughty"
+	InternalServerErrorMessage = "Something went wrong"
+	MethodNotAllowedMessage    = "Method not allowed"
+	UnauthorizedMessage        = "Unauthorized"
+	ForbiddenMessage           = "Forbidden"
 )
