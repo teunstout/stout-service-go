@@ -48,28 +48,28 @@ func (u *LogoutUsecaseInterface) Logout(sessionToken string, csrfToken string, l
 	return nil
 }
 
-func (r *LogoutUsecaseInterface) deleteAllSessions(accountID int32) error {
-	if err := r.csrfRepo.DeleteCsrfTokensByAccountId(accountID); err != nil {
-		r.logger.Info("Error deleting csrf tokens", zap.Int32("aid", accountID), zap.Error(err))
+func (u *LogoutUsecaseInterface) deleteAllSessions(accountID int32) error {
+	if err := u.csrfRepo.DeleteCsrfTokensByAccountId(accountID); err != nil {
+		u.logger.Info("Error deleting csrf tokens", zap.Int32("aid", accountID), zap.Error(err))
 		return err
 	}
 
-	if err := r.sessionRepo.DeleteSessionTokensByAccountId(accountID); err != nil {
-		r.logger.Info("Error deleting session tokens", zap.Int32("aid", accountID), zap.Error(err))
+	if err := u.sessionRepo.DeleteSessionTokensByAccountId(accountID); err != nil {
+		u.logger.Info("Error deleting session tokens", zap.Int32("aid", accountID), zap.Error(err))
 		return err
 	}
 
 	return nil
 }
 
-func (r *LogoutUsecaseInterface) deleteSingleSession(csrfToken string, sessionToken string) error {
-	if err := r.csrfRepo.DeleteCsrfToken(csrfToken); err != nil {
-		r.logger.Info("Error deleting csrf token", zap.String("csrf", csrfToken), zap.Error(err))
+func (u *LogoutUsecaseInterface) deleteSingleSession(csrfToken string, sessionToken string) error {
+	if err := u.csrfRepo.DeleteCsrfToken(csrfToken); err != nil {
+		u.logger.Info("Error deleting csrf token", zap.String("csrf", csrfToken), zap.Error(err))
 		return err
 	}
 
-	if err := r.sessionRepo.DeleteSessionToken(sessionToken); err != nil {
-		r.logger.Info("Error deleting session tokens", zap.String("session", sessionToken), zap.Error(err))
+	if err := u.sessionRepo.DeleteSessionToken(sessionToken); err != nil {
+		u.logger.Info("Error deleting session tokens", zap.String("session", sessionToken), zap.Error(err))
 		return err
 	}
 

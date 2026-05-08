@@ -48,6 +48,8 @@ services:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
     volumes:
       - rsa_keys:/app/keys
+    ports:
+      - "8443:8080"
 
   rsa-key-generator:
     image: alpine:latest

@@ -28,7 +28,6 @@ func (h *JwksHandlerInterface) HandleJwksKeys(w http.ResponseWriter, r *http.Req
 	}
 
 	jwks := h.usecase.JwksKeys()
-	h.logger.Debug("Requested JWKS Keys", zap.Any("keys", jwks))
 
 	jsonResponse, err := json.Marshal(jwks)
 	if err != nil {

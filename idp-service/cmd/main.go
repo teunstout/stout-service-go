@@ -14,9 +14,8 @@ import (
 )
 
 var (
-	verifyKey  *rsa.PublicKey
-	signKey    *rsa.PrivateKey
-	serverPort int
+	verifyKey *rsa.PublicKey
+	signKey   *rsa.PrivateKey
 )
 
 func main() {

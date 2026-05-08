@@ -2,6 +2,7 @@ package handler
 
 import (
 	"crypto/rsa"
+	"encoding/json"
 	"fmt"
 	"net/http"
 
@@ -40,6 +41,13 @@ func (h *RestrictedHandlerInterface) RestrictedHandler(w http.ResponseWriter, r 
 		return
 	}
 
-	// Token is valid
-	fmt.Fprintln(w, "Welcome,", token.Claims.(*jwt.MapClaims))
+	h.logger.Info("Token", zap.Any("Claims", token.Claims.(*jwt.MapClaims)))
+	jsonRes, err := json.Marshal(token.Claims.(*jwt.MapClaims))
+	if err != nil {
+		w.WriteHeader(http.StatusConflict)
+		return
+	}
+
+	w.WriteHeader(http.StatusOK)
+	w.Write(jsonRes)
 }
