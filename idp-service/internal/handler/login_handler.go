@@ -37,25 +37,22 @@ func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Reque
 	}
 
 	if loginData.Username == "" || loginData.Password == "" {
-		h.logger.Debug("Invalid login attempt",
-			zap.String("username", loginData.Username),
-			zap.String("password", loginData.Password),
-		)
+		h.logger.Debug("Missing username or password", zap.String("username", loginData.Username))
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
 		return
 	}
 
-	session, csrf, jwt, err := h.usecase.Login(loginData.Username, loginData.Password)
+	sessionToken, csrfToken, jwt, err := h.usecase.Login(loginData.Username, loginData.Password)
 	if err != nil {
-		h.logger.Info("Login failed", zap.String("username", loginData.Username))
+		h.logger.Info("Login failed", zap.String("username", loginData.Username), zap.Error(err))
 		http.Error(w, domain.UnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
-	body := map[string]string{"jwt": jwt, "csrfToken": csrf.Value, "sessionToken": session.Value}
+	body := map[string]string{"jwt": jwt, "csrfToken": csrfToken, "sessionToken": sessionToken}
 	jsonResponse, err := json.Marshal(body)
 	if err != nil {
-		h.logger.Info("Creating Json response failed", zap.Any("body", body))
+		h.logger.Info("Creating Json response failed", zap.Any("body", body), zap.Error(err))
 		http.Error(w, domain.InternalServerErrorMessage, http.StatusConflict)
 		return
 	}
