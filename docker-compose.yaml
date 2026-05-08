@@ -40,7 +40,7 @@ services:
 
   idp-server:
     build: idp-service
-    container_name: login_service
+    container_name: idp_service
     depends_on:
       rsa-key-generator:
         condition: service_completed_successfully
