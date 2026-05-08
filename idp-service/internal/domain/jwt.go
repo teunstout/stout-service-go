@@ -11,9 +11,9 @@ import (
 func CreateJwt(mid int32, signKey *rsa.PrivateKey) (string, error) {
 	t := jwt.New(jwt.SigningMethodRS256)
 	t.Claims = jwt.MapClaims{
-		"iss": "login-service", // https://golang-jwt.github.io/jwt/usage/signing_methods/
+		"iss": "idp-server", // https://golang-jwt.github.io/jwt/usage/signing_methods/
 		"iat": jwt.NewNumericDate(time.Now()),
-		"exp": jwt.NewNumericDate(time.Now().Add(24 * time.Hour)),
+		"exp": jwt.NewNumericDate(time.Now().Add(12 * time.Hour)),
 		"jti": uuid.New(),
 		"sub": mid,
 	}

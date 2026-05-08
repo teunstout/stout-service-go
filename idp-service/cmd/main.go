@@ -2,7 +2,6 @@ package main
 
 import (
 	"crypto/rsa"
-	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,9 +14,8 @@ import (
 )
 
 var (
-	verifyKey  *rsa.PublicKey
-	signKey    *rsa.PrivateKey
-	serverPort int
+	verifyKey *rsa.PublicKey
+	signKey   *rsa.PrivateKey
 )
 
 func main() {
@@ -62,23 +60,29 @@ func main() {
 	sessionRepo := repository.NewSessionTokenRepository(connString, logger)
 	csrfRepo := repository.NewCsrfRepository(connString, logger)
 
-	fmt.Printf("DEBUG construct: sessionRepo=%p isNil=%v\n", sessionRepo, sessionRepo == nil)
 	authUsecase := usecase.NewAuthenticationUsecase(sessionRepo, csrfRepo, logger)
 	loginUsecase := usecase.NewLoginUsecase(accountRepo, sessionRepo, csrfRepo, logger, signKey)
 	registerUsecase := usecase.NewRegisterUsecase(accountRepo, logger, signKey)
 	logoutUsecase := usecase.NewLogoutUsecase(sessionRepo, csrfRepo, logger)
+	jwksUsecase := usecase.JwksUsecase(logger, &signKey.PublicKey)
 
 	authHandler := handler.NewAuthenticateHandler(authUsecase, logger)
 	registerHandler := handler.NewRegisterHandler(registerUsecase, logger)
 	loginHandler := handler.NewLoginHandler(loginUsecase, logger)
 	logoutHandler := handler.NewLogoutHandler(logoutUsecase, logger)
 	restrictedHandler := handler.NewRestrictedHandler(authUsecase, logger, verifyKey)
+	jwksHandler := handler.JwksHandler(jwksUsecase, logger)
 
 	http.HandleFunc("/v1/register", registerHandler.HandleRegister)
 	http.HandleFunc("/v1/login", loginHandler.HandleLogin)
 	http.HandleFunc("/v1/logout", logoutHandler.HandleLogout)
-	http.HandleFunc("/v1/authenticate", authHandler.HandleAuthenticate)
-	http.HandleFunc("/v1/endpoints/restricted", restrictedHandler.RestrictedHandler)
+	http.HandleFunc("/.well-known/jwks.json", jwksHandler.HandleJwksKeys)
+
+	// Handle the session and csrf token
+	http.HandleFunc("/v1/auth", authHandler.HandleAuthenticate)
+
+	// This is an example and your spring service has to implement this part.
+	http.HandleFunc("/v1/endpoints/restricted/example", restrictedHandler.RestrictedHandler)
 
 	log.Println("Server running on port 8080")
 	http.ListenAndServe(":8080", nil)

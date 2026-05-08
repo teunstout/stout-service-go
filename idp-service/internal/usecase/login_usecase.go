@@ -4,7 +4,6 @@ import (
 	"crypto/rsa"
 	"errors"
 	"fmt"
-	"net/http"
 	"time"
 
 	"go.uber.org/zap"
@@ -36,61 +35,39 @@ func NewLoginUsecase(
 	}
 }
 
-func (u *LoginUsecaseInterface) Login(username string, password string) (*http.Cookie, *http.Cookie, string, error) {
-	account, err := u.accountRepo.GetAccount(username)
+func (u *LoginUsecaseInterface) Login(username string, password string) (string, string, string, error) {
+	account, err := u.accountRepo.GetAccountByUsername(username)
 	if err != nil {
-		u.logger.Info("Error getting account", zap.String("username", username), zap.Error(err))
-		return nil, nil, "", fmt.Errorf("Invalid username or password")
+		u.logger.Info("Invalid username", zap.String("username", username), zap.Error(err))
+		return "", "", "", fmt.Errorf("Invalid username or password")
 	}
 
-	session, csrf, err := u.createSession(password, password, account)
-	if err != nil {
-		u.logger.Warn("Error creating session", zap.String("username", username), zap.Error(err))
-		return nil, nil, "", fmt.Errorf("Error creating session")
-	}
-
-	jwt, err := domain.CreateJwt(account.ID, u.privateKey)
-	if err != nil {
-		u.logger.Warn("Error creating jwt", zap.String("username", username), zap.Error(err))
-	}
-
-	return session, csrf, jwt, nil
-}
-
-func (u *LoginUsecaseInterface) createSession(username string, password string, account domain.Account) (*http.Cookie, *http.Cookie, error) {
 	if passed := domain.CheckPasswordHash(password, account.Password); !passed {
-		u.logger.Info("password mismatch", zap.String("username", username))
-		return nil, nil, errors.New("Invalid password")
+		u.logger.Debug("Invalid password", zap.String("username", username), zap.Error(err))
+		return "", "", "", errors.New("Invalid username or password")
 	}
 
+	// Create session token and csrf token
 	tokenExpiration := time.Now().Add(time.Hour * 1)
 	sessionToken := domain.GenerateSecureToken()
 	if err := u.sessionRepo.CreateSessionToken(sessionToken, account.ID, tokenExpiration); err != nil {
-		// u.logger.Info("Session creation error", zap.String("username", username), zap.Error(err))
-		return nil, nil, errors.New("Error creating session token")
+		u.logger.Debug("Error creating session token", zap.String("username", username), zap.Error(err))
+		return "", "", "", errors.New("Error creating session token")
 	}
 
 	csrfToken := domain.GenerateSecureToken()
 	if err := u.csrfRepo.CreateCsrfToken(csrfToken, account.ID, tokenExpiration); err != nil {
-		u.logger.Info("CSRF token creation error", zap.String("username", username), zap.Error(err))
-		return nil, nil, errors.New("Error creating csrf token")
+		u.logger.Debug("Error creating csrf token", zap.String("username", username), zap.Error(err))
+		return "", "", "", errors.New("Error creating csrf token")
 	}
 
-	sessionCookie := http.Cookie{
-		Name:     "session_token",
-		Value:    sessionToken, // assuming sessionToken is a string containing the token
-		Path:     "/",
-		Expires:  tokenExpiration,
-		HttpOnly: true,
+	// Create JWT token
+	jwt, err := domain.CreateJwt(account.ID, u.privateKey)
+	if err != nil {
+		u.logger.Warn("Error creating jwt", zap.String("username", username), zap.Error(err))
+		return "", "", "", fmt.Errorf("Error creating JWT")
 	}
 
-	csrfCookie := http.Cookie{
-		Name:     "csrf_token",
-		Value:    csrfToken,
-		Path:     "/",
-		Expires:  tokenExpiration,
-		HttpOnly: false,
-	}
-
-	return &sessionCookie, &csrfCookie, nil
+	u.logger.Debug("User is found in database and generated the jwt, session token, and csrf token", zap.String("username", username))
+	return sessionToken, csrfToken, jwt, nil
 }

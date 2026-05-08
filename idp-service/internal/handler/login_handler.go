@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 
 	"net/http"
-	"time"
 
 	"go.uber.org/zap"
 	"stout.dev/idp/internal/domain"
@@ -38,47 +37,25 @@ func (h *LoginHandlerInterface) HandleLogin(w http.ResponseWriter, r *http.Reque
 	}
 
 	if loginData.Username == "" || loginData.Password == "" {
-		h.logger.Debug("Invalid login attempt",
-			zap.String("username", loginData.Username),
-			zap.String("password", loginData.Password),
-		)
+		h.logger.Debug("Missing username or password", zap.String("username", loginData.Username))
 		http.Error(w, "Username and password are required", http.StatusBadRequest)
 		return
 	}
 
-	session, csrf, jwt, err := h.usecase.Login(loginData.Username, loginData.Password)
+	sessionToken, csrfToken, jwt, err := h.usecase.Login(loginData.Username, loginData.Password)
 	if err != nil {
-		h.logger.Info("Login failed", zap.String("username", loginData.Username))
+		h.logger.Info("Login failed", zap.String("username", loginData.Username), zap.Error(err))
 		http.Error(w, domain.UnauthorizedMessage, http.StatusUnauthorized)
 		return
 	}
 
-	exprDate := time.Now().Add(24 * time.Hour)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "JWT",
-		Value:    jwt,
-		Path:     "/",
-		HttpOnly: false,
-		Secure:   true,
-		SameSite: http.SameSiteStrictMode,
-		Expires:  exprDate,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "csrf_token",
-		Value:    csrf.Value,
-		Path:     "/",
-		Expires:  exprDate,
-		HttpOnly: false,
-	})
-
-	http.SetCookie(w, &http.Cookie{
-		Name:     "session_token",
-		Value:    session.Value,
-		Path:     "/",
-		Expires:  exprDate,
-		HttpOnly: true,
-	})
-
+	body := map[string]string{"jwt": jwt, "csrfToken": csrfToken, "sessionToken": sessionToken}
+	jsonResponse, err := json.Marshal(body)
+	if err != nil {
+		h.logger.Info("Creating Json response failed", zap.Any("body", body), zap.Error(err))
+		http.Error(w, domain.InternalServerErrorMessage, http.StatusConflict)
+		return
+	}
 	w.WriteHeader(http.StatusOK)
+	w.Write([]byte(jsonResponse))
 }

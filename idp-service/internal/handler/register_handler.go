@@ -47,6 +47,7 @@ func (h *RegisterHandlerInterface) HandleRegister(w http.ResponseWriter, r *http
 	if err := h.usecase.Register(username, password); err != nil {
 		w.WriteHeader(http.StatusForbidden)
 		w.Write([]byte(err.Error()))
+		return
 	}
 
 	w.WriteHeader(http.StatusCreated)

@@ -44,7 +44,7 @@ func (r *AccountRepositoryInterface) CreateAccount(username string, password str
 	return err
 }
 
-func (r *AccountRepositoryInterface) GetAccount(username string) (domain.Account, error) {
+func (r *AccountRepositoryInterface) GetAccountByUsername(username string) (domain.Account, error) {
 	var account domain.Account
 	r.logger.Debug("Getting account", zap.String("username", username))
 	err := r.conn.QueryRow(context.Background(), `
