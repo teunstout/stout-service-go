@@ -1,0 +1,64 @@
+services:
+  postgres:
+    image: postgres:17
+    container_name: postgres
+    environment:
+      POSTGRES_USER: golang
+      POSTGRES_PASSWORD: golang
+      POSTGRES_DB: production
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init.sql:/docker-entrypoint-initdb.d/init.sql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -p 5432 -U golang -d production"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 5s
+
+  idp-server:
+    build: idp-service
+    container_name: idp_service
+    depends_on:
+      - postgres
+      - rsa-key-generator:
+          condition: service_completed_successfully
+    environment:
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
+    volumes:
+      - rsa_keys:/app/keys
+    ports:
+      - "8443:8080"
+
+  rsa-key-generator:
+    image: alpine:latest
+    container_name: rsa_key_generator
+    volumes:
+      - rsa_keys:/app/keys
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "apk add --no-cache openssl && mkdir -p /app/keys && openssl genrsa -out /app/keys/app.rsa 3072 && openssl rsa -in /app/keys/app.rsa -pubout > /app/keys/app.rsa.pub && chmod 644 /app/keys/app.rsa /app/keys/app.rsa.pub",
+      ]
+    healthcheck:
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "[ -f /app/keys/app.rsa ] && [ -f /app/keys/app.rsa.pub ]",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 5s
+    deploy:
+      restart_policy:
+        condition: none
+
+volumes:
+  postgres_data:
+  rsa_keys:

@@ -38,19 +38,6 @@ services:
     volumes:
       - rsa_keys:/app/keys
 
-  idp-server:
-    build: idp-service
-    container_name: idp_service
-    depends_on:
-      rsa-key-generator:
-        condition: service_completed_successfully
-    environment:
-      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
-    volumes:
-      - rsa_keys:/app/keys
-    ports:
-      - "8443:8080"
-
   rsa-key-generator:
     image: alpine:latest
     container_name: rsa_key_generator
@@ -73,7 +60,6 @@ services:
     depends_on:
       - content-service
       - jisho-service
-      - idp-server
     ports:
       - "8080:8080"
 
