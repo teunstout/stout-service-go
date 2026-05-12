@@ -17,6 +17,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
+    network: stout-idp-isolated
 
   idp-server:
     build: idp-service
@@ -31,6 +32,9 @@ services:
       - rsa_keys:/app/keys
     ports:
       - "8443:8080"
+    network:
+      - stout-idp-isolated
+      - stout-idp-public
 
   rsa-key-generator:
     image: alpine:latest
@@ -58,7 +62,13 @@ services:
     deploy:
       restart_policy:
         condition: none
+    network: stout-idp-isolated
 
 volumes:
   postgres_data:
   rsa_keys:
+
+networks:
+  stout--idp-isolated:
+    internal: true # No external connectivity
+  stout--idp-public: # Standard bridge network, created by Compose on docker compose up
