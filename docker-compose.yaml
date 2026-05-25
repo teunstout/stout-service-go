@@ -18,8 +18,6 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    networks: 
-      - stout-isolated
 
   content-service:
     build: ./content-service
@@ -30,8 +28,6 @@ services:
         condition: service_healthy
     environment:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
-    networks: 
-      - stout-isolated
 
   jisho-service:
     build: ./jisho-service
@@ -44,8 +40,20 @@ services:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
     volumes:
       - rsa_keys:/app/keys
-    networks: 
-      - stout-isolated
+
+  idp-server:
+    build: idp-service
+    restart: unless-stopped
+    container_name: idp_service
+    depends_on:
+      rsa-key-generator:
+        condition: service_completed_successfully
+    environment:
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
+    volumes:
+      - rsa_keys:/app/keys
+    ports:
+      - "8443:8080"
 
   rsa-key-generator:
     image: alpine:latest
@@ -73,8 +81,6 @@ services:
     deploy:
       restart_policy:
         condition: none
-    networks: 
-      - stout-isolated
 
   nginx:
     build: ./nginx
@@ -83,17 +89,10 @@ services:
     depends_on:
       - content-service
       - jisho-service
+      - idp-server
     ports:
       - "8080:8080"
-    networks:
-      - stout-isolated
-      - stout-public
 
 volumes:
   postgres_data:
   rsa_keys:
-
-networks:
-  stout-isolated:
-    internal: true # No external connectivity
-  stout-public: # Standard bridge network, created by Compose on docker compose up
