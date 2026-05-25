@@ -1,4 +1,4 @@
-FROM golang:1.24 AS builder
+FROM golang:1.26 AS builder
 
 WORKDIR /build
 
@@ -6,7 +6,7 @@ COPY . .
 RUN go mod download
 RUN go build -o idp-service ./cmd
 
-FROM golang:1.24
+FROM golang:1.26
 
 EXPOSE 8080
 

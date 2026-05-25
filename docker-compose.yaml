@@ -1,7 +1,23 @@
 services:
+  rsa-key-generator:
+    image: alpine:latest
+    container_name: rsa_key_generator
+    volumes:
+      - rsa_keys:/app/keys
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "apk add --no-cache openssl && mkdir -p /app/keys && openssl genrsa -out /app/keys/app.rsa 3072 && openssl rsa -in /app/keys/app.rsa -pubout > /app/keys/app.rsa.pub && chmod 644 /app/keys/app.rsa /app/keys/app.rsa.pub",
+      ]
+    deploy:
+      restart_policy:
+        condition: none
+
   postgres:
     image: postgres:17
     container_name: postgres
+    restart: unless-stopped
     environment:
       POSTGRES_USER: golang
       POSTGRES_PASSWORD: golang
@@ -12,23 +28,48 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -p 5432 -U golang -d production" ]
+      test: ["CMD-SHELL", "pg_isready -p 5432 -U golang -d production"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
+    networks:
+      - stout-isolated
+
+  idp-server:
+    build: idp-service
+    container_name: idp_service
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+      rsa-key-generator:
+        condition: service_completed_successfully
+    environment:
+      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
+    volumes:
+      - rsa_keys:/app/keys:ro
+    ports:
+      - "443:8080"
+    networks:
+      - stout-isolated
+      - stout-public
 
   content-service:
     build: ./content-service
     container_name: content_service
+    restart: unless-stopped
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
+    networks:
+      - stout-isolated
 
   jisho-service:
     build: ./jisho-service
+    restart: unless-stopped
     container_name: jisho_service
     depends_on:
       rsa-key-generator:
@@ -37,6 +78,7 @@ services:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
     volumes:
       - rsa_keys:/app/keys
+<<<<<<< HEAD
 
   idp-server:
     build: idp-service
@@ -66,17 +108,33 @@ services:
     deploy:
       restart_policy:
         condition: none
+=======
+    networks:
+      - stout-isolated
+>>>>>>> main
 
   nginx:
     build: ./nginx
     container_name: nginx
+    restart: unless-stopped
     depends_on:
       - content-service
       - jisho-service
+<<<<<<< HEAD
       - idp-server
+=======
+>>>>>>> main
     ports:
       - "8080:8080"
+    networks:
+      - stout-isolated
+      - stout-public
 
 volumes:
   postgres_data:
   rsa_keys:
+
+networks:
+  stout-isolated:
+    internal: true # No external connectivity
+  stout-public: # Standard bridge network, created by Compose on docker compose up
