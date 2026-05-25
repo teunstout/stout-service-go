@@ -1,6 +1,7 @@
 services:
   postgres:
     image: postgres:17
+    restart: unless-stopped
     container_name: postgres
     environment:
       POSTGRES_USER: golang
@@ -12,23 +13,29 @@ services:
       - postgres_data:/var/lib/postgresql/data
       - ./init.sql:/docker-entrypoint-initdb.d/init.sql
     healthcheck:
-      test: [ "CMD-SHELL", "pg_isready -p 5432 -U golang -d production" ]
+      test: ["CMD-SHELL", "pg_isready -p 5432 -U golang -d production"]
       interval: 10s
       timeout: 5s
       retries: 5
       start_period: 5s
+    networks: 
+      - stout-isolated
 
   content-service:
     build: ./content-service
+    restart: unless-stopped
     container_name: content_service
     depends_on:
       postgres:
         condition: service_healthy
     environment:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
+    networks: 
+      - stout-isolated
 
   jisho-service:
     build: ./jisho-service
+    restart: unless-stopped
     container_name: jisho_service
     depends_on:
       rsa-key-generator:
@@ -37,28 +44,28 @@ services:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
     volumes:
       - rsa_keys:/app/keys
-
-  idp-server:
-    build: idp-service
-    container_name: idp_service
-    depends_on:
-      rsa-key-generator:
-        condition: service_completed_successfully
-    environment:
-      CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
-    volumes:
-      - rsa_keys:/app/keys
-    ports:
-      - "8443:8080"
+    networks: 
+      - stout-isolated
 
   rsa-key-generator:
     image: alpine:latest
     container_name: rsa_key_generator
     volumes:
       - rsa_keys:/app/keys
-    entrypoint: [ "/bin/sh", "-c", "apk add --no-cache openssl && mkdir -p /app/keys && openssl genrsa -out /app/keys/app.rsa 3072 && openssl rsa -in /app/keys/app.rsa -pubout > /app/keys/app.rsa.pub && chmod 644 /app/keys/app.rsa /app/keys/app.rsa.pub" ]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "apk add --no-cache openssl && mkdir -p /app/keys && openssl genrsa -out /app/keys/app.rsa 3072 && openssl rsa -in /app/keys/app.rsa -pubout > /app/keys/app.rsa.pub && chmod 644 /app/keys/app.rsa /app/keys/app.rsa.pub",
+      ]
     healthcheck:
-      test: [ "CMD", "sh", "-c", "[ -f /app/keys/app.rsa ] && [ -f /app/keys/app.rsa.pub ]" ]
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "[ -f /app/keys/app.rsa ] && [ -f /app/keys/app.rsa.pub ]",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
@@ -66,17 +73,27 @@ services:
     deploy:
       restart_policy:
         condition: none
+    networks: 
+      - stout-isolated
 
   nginx:
     build: ./nginx
+    restart: unless-stopped
     container_name: nginx
     depends_on:
       - content-service
       - jisho-service
-      - idp-server
     ports:
       - "8080:8080"
+    networks:
+      - stout-isolated
+      - stout-public
 
 volumes:
   postgres_data:
   rsa_keys:
+
+networks:
+  stout-isolated:
+    internal: true # No external connectivity
+  stout-public: # Standard bridge network, created by Compose on docker compose up
