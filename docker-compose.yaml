@@ -18,7 +18,7 @@ services:
       timeout: 5s
       retries: 5
       start_period: 5s
-    networks: 
+    networks:
       - stout-isolated
 
   content-service:
@@ -30,7 +30,7 @@ services:
         condition: service_healthy
     environment:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
-    networks: 
+    networks:
       - stout-isolated
 
   jisho-service:
@@ -44,7 +44,7 @@ services:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
     volumes:
       - rsa_keys:/app/keys
-    networks: 
+    networks:
       - stout-isolated
 
   rsa-key-generator:
@@ -52,9 +52,20 @@ services:
     container_name: rsa_key_generator
     volumes:
       - rsa_keys:/app/keys
-    entrypoint: [ "/bin/sh", "-c", "apk add --no-cache openssl && mkdir -p /app/keys && openssl genrsa -out /app/keys/app.rsa 3072 && openssl rsa -in /app/keys/app.rsa -pubout > /app/keys/app.rsa.pub && chmod 644 /app/keys/app.rsa /app/keys/app.rsa.pub" ]
+    entrypoint:
+      [
+        "/bin/sh",
+        "-c",
+        "apk add --no-cache openssl && mkdir -p /app/keys && openssl genrsa -out /app/keys/app.rsa 3072 && openssl rsa -in /app/keys/app.rsa -pubout > /app/keys/app.rsa.pub && chmod 644 /app/keys/app.rsa /app/keys/app.rsa.pub",
+      ]
     healthcheck:
-      test: [ "CMD", "sh", "-c", "[ -f /app/keys/app.rsa ] && [ -f /app/keys/app.rsa.pub ]" ]
+      test:
+        [
+          "CMD",
+          "sh",
+          "-c",
+          "[ -f /app/keys/app.rsa ] && [ -f /app/keys/app.rsa.pub ]",
+        ]
       interval: 10s
       timeout: 5s
       retries: 3
