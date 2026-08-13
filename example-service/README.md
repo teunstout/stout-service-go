@@ -1,3 +1,5 @@
+> This is a scaffold/template for starting a new Go service in this style, not a running service — it isn't built by `docker-compose.yaml` and its `main.go` just prints a hello-world message. Copy this folder as a starting point rather than trying to curl it.
+
 # Folder structure
 
 ```bash
