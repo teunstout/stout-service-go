@@ -12,17 +12,17 @@ import (
 )
 
 type LoginUsecaseInterface struct {
-	accountRepo *repository.AccountRepositoryInterface
-	sessionRepo *repository.SessionTokenRepositoryInterface
-	csrfRepo    *repository.CsrfRepositoryInterface
+	accountRepo repository.AccountRepository
+	sessionRepo repository.SessionTokenRepository
+	csrfRepo    repository.CsrfRepository
 	logger      *zap.Logger
 	privateKey  *rsa.PrivateKey
 }
 
 func NewLoginUsecase(
-	accountRepo *repository.AccountRepositoryInterface,
-	sessionRepo *repository.SessionTokenRepositoryInterface,
-	csrfRepo *repository.CsrfRepositoryInterface,
+	accountRepo repository.AccountRepository,
+	sessionRepo repository.SessionTokenRepository,
+	csrfRepo repository.CsrfRepository,
 	logger *zap.Logger,
 	privateKey *rsa.PrivateKey) *LoginUsecaseInterface {
 
@@ -35,16 +35,16 @@ func NewLoginUsecase(
 	}
 }
 
-func (u *LoginUsecaseInterface) Login(username string, password string) (string, string, string, error) {
+func (u *LoginUsecaseInterface) Login(username string, password string) (domain.LoginResult, error) {
 	account, err := u.accountRepo.GetAccountByUsername(username)
 	if err != nil {
 		u.logger.Info("Invalid username", zap.String("username", username), zap.Error(err))
-		return "", "", "", fmt.Errorf("Invalid username or password")
+		return domain.LoginResult{}, fmt.Errorf("Invalid username or password")
 	}
 
 	if passed := domain.CheckPasswordHash(password, account.Password); !passed {
-		u.logger.Debug("Invalid password", zap.String("username", username), zap.Error(err))
-		return "", "", "", errors.New("Invalid username or password")
+		u.logger.Debug("Invalid password", zap.String("username", username))
+		return domain.LoginResult{}, errors.New("Invalid username or password")
 	}
 
 	// Create session token and csrf token
@@ -52,22 +52,27 @@ func (u *LoginUsecaseInterface) Login(username string, password string) (string,
 	sessionToken := domain.GenerateSecureToken()
 	if err := u.sessionRepo.CreateSessionToken(sessionToken, account.ID, tokenExpiration); err != nil {
 		u.logger.Debug("Error creating session token", zap.String("username", username), zap.Error(err))
-		return "", "", "", errors.New("Error creating session token")
+		return domain.LoginResult{}, errors.New("Error creating session token")
 	}
 
 	csrfToken := domain.GenerateSecureToken()
 	if err := u.csrfRepo.CreateCsrfToken(csrfToken, account.ID, tokenExpiration); err != nil {
 		u.logger.Debug("Error creating csrf token", zap.String("username", username), zap.Error(err))
-		return "", "", "", errors.New("Error creating csrf token")
+		return domain.LoginResult{}, errors.New("Error creating csrf token")
 	}
 
 	// Create JWT token
 	jwt, err := domain.CreateJwt(account.ID, u.privateKey)
 	if err != nil {
 		u.logger.Warn("Error creating jwt", zap.String("username", username), zap.Error(err))
-		return "", "", "", fmt.Errorf("Error creating JWT")
+		return domain.LoginResult{}, fmt.Errorf("Error creating JWT")
 	}
 
 	u.logger.Debug("User is found in database and generated the jwt, session token, and csrf token", zap.String("username", username))
-	return sessionToken, csrfToken, jwt, nil
+	return domain.LoginResult{
+		Jwt:          jwt,
+		SessionToken: sessionToken,
+		CsrfToken:    csrfToken,
+		ExpiresAt:    tokenExpiration,
+	}, nil
 }

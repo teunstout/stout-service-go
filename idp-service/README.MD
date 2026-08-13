@@ -30,25 +30,53 @@ curl -i -X POST http://localhost:8080/v1/register \
 
 #### Login
 
+Responds with `Set-Cookie: session_token=...` (HttpOnly) and a JSON body of `{"jwt": "...", "csrfToken": "..."}`.
+
 ```bash
 curl -i -X POST http://localhost:8080/v1/login \
   -H "Content-Type: application/json" \
   -d '{"username":"golang","password":"golang"}'
 ```
 
+#### Authenticate (session check)
+
+Validates the `session_token` cookie against the `x-csrf-token` header, as set/returned by `/v1/login`. Intended to be called by other services (e.g. nginx `auth_request`) to check whether a browser session is still valid.
+
+```bash
+curl -i -X GET http://localhost:8080/v1/auth \
+  -H "Cookie: session_token=<session-token-from-login>" \
+  -H "x-csrf-token: <csrf-token-from-login>"
+```
+
+#### Logout
+
+Deletes the session/CSRF tokens and clears the `session_token` cookie. Add `?all_devices=true` to log out every session for the account.
+
+```bash
+curl -i -X GET http://localhost:8080/v1/logout \
+  -H "Cookie: session_token=<session-token-from-login>" \
+  -H "x-csrf-token: <csrf-token-from-login>"
+```
+
 #### Restricted call
+
+The JWT returned by `/v1/login` must be sent as a `Bearer` token.
 
 ```bash
 curl -i -X GET http://localhost:8080/v1/endpoints/restricted/example \
-  -H "Content-Type: application/json" \
-  -H "Authorization: eyJhbGciOiJSUzI1NiIsInR5cCI6IkpXVCJ9.eyJleHAiOjE3NzgyMDEzNjYsImlhdCI6MTc3ODExNDk2NiwiaXNzIjoibG9naW4tc2VydmljZSIsImp0aSI6IjJlOTg0YTUyLTg4MjQtNDQ5OS05ZjMwLWRjN2I4OTZkOTJhMCIsInN1YiI6MX0.dWgN8FOientvbUpqHQ5fY1zIZzLGOimO5w2jzvD6SelR0Bkhb0MId98LWIrRp6nPaeWUe1fLbJop5JkLBVMtWUOExcqV35gvKdYrkLj0OT1aslnrVKWQqq0AlbmlnQFYWyXo-Psmmy7Ks8aRpt4IVWgdkvrqu8TxTpu4hfoai5lBXpltw9yT05ppjUWoub2ZWltEW8evD0WsTkYe_kxgRikvqCHFW2ONSh7OWznqL5y2RUYIPfHkbVlVpcOH7ICnOoiwmL6y7at3vXMVVl9WR4TdbHGG9X_woj_omlA34f68QQIfNEusZPMdR-HUYSan24U0HcIrPXUak-I2EM8fm9frG5g-llt1ZZwfHdA_YGdoBKx6eVpXHDnzVUJbTygi8VayYI2GStcTwCxS4TnshZ_DyjKGe2XSS3atfNJNkalagamyUYZRuNkEClQuoxx1xLROIIIC4jwjvULZYZgdLdF9Zm5evhQgg6s0iSiR6oetve4vIF0YxTTN1cE5rpdh" \
-  -d '{"username":"golang","password":"golang"}'
+  -H "Authorization: Bearer <jwt-from-login>"
 ```
 
 #### JWKS
 
 ```bash
 curl -i -X GET http://localhost:8080/.well-known/jwks.json
+```
+
+#### Health
+
+```bash
+curl -i -X GET http://localhost:8080/health
 ```
 
 ## Reference

@@ -3,25 +3,19 @@ package repository
 import (
 	"context"
 
-	"github.com/jackc/pgx/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"stout.dev/idp/internal/domain"
 )
 
 type AccountRepositoryInterface struct {
-	conn   *pgx.Conn
+	pool   *pgxpool.Pool
 	logger *zap.Logger
 }
 
-func NewAccountRepository(connString string, l *zap.Logger) *AccountRepositoryInterface {
-	conn, err := pgx.Connect(context.Background(), connString)
-	if err != nil {
-		l.Error("Unable to connect to database", zap.Error(err))
-		return nil
-	}
-
+func NewAccountRepository(pool *pgxpool.Pool, l *zap.Logger) *AccountRepositoryInterface {
 	return &AccountRepositoryInterface{
-		conn:   conn,
+		pool:   pool,
 		logger: l,
 	}
 }
@@ -29,7 +23,7 @@ func NewAccountRepository(connString string, l *zap.Logger) *AccountRepositoryIn
 func (r *AccountRepositoryInterface) AccountExists(username string) (bool, error) {
 	r.logger.Debug("Checking if account exists", zap.String("username", username))
 	var exists bool
-	err := r.conn.QueryRow(context.Background(), `
+	err := r.pool.QueryRow(context.Background(), `
 		SELECT EXISTS(SELECT 1 FROM accounts WHERE username = LOWER($1))
 	`, username).Scan(&exists)
 	return exists, err
@@ -37,7 +31,7 @@ func (r *AccountRepositoryInterface) AccountExists(username string) (bool, error
 
 func (r *AccountRepositoryInterface) CreateAccount(username string, password string) error {
 	r.logger.Debug("Creating account", zap.String("username", username))
-	_, err := r.conn.Exec(context.Background(), `
+	_, err := r.pool.Exec(context.Background(), `
 		INSERT INTO accounts (username, password)
 		VALUES (LOWER($1), $2)
 	`, username, password)
@@ -47,7 +41,7 @@ func (r *AccountRepositoryInterface) CreateAccount(username string, password str
 func (r *AccountRepositoryInterface) GetAccountByUsername(username string) (domain.Account, error) {
 	var account domain.Account
 	r.logger.Debug("Getting account", zap.String("username", username))
-	err := r.conn.QueryRow(context.Background(), `
+	err := r.pool.QueryRow(context.Background(), `
 		SELECT id, username, password, created_at, updated_at
 		FROM accounts WHERE username = LOWER($1)
 	`, username).Scan(&account.ID, &account.Username, &account.Password, &account.CreatedAt, &account.UpdatedAt)

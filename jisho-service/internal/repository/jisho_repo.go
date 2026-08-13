@@ -27,7 +27,7 @@ func (r *JishoRepositoryInterface) SaveSearchHistory(mid int32, keyword string) 
 
 	_, err := r.conn.Exec(context.Background(), `
 		INSERT INTO member_search_history(member_id, search_term)
-		VALUES ($1, $2, $3)
+		VALUES ($1, $2)
 	`, mid, keyword)
 
 	if err != nil {

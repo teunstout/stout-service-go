@@ -2,7 +2,6 @@ package usecase
 
 import (
 	"crypto/rsa"
-	"errors"
 
 	"go.uber.org/zap"
 	"stout.dev/idp/internal/domain"
@@ -10,12 +9,12 @@ import (
 )
 
 type RegisterUsecaseInterface struct {
-	accountRepo *repository.AccountRepositoryInterface
+	accountRepo repository.AccountRepository
 	logger      *zap.Logger
 	privateKey  *rsa.PrivateKey
 }
 
-func NewRegisterUsecase(accountRepo *repository.AccountRepositoryInterface, logger *zap.Logger, privateKey *rsa.PrivateKey) *RegisterUsecaseInterface {
+func NewRegisterUsecase(accountRepo repository.AccountRepository, logger *zap.Logger, privateKey *rsa.PrivateKey) *RegisterUsecaseInterface {
 	return &RegisterUsecaseInterface{
 		accountRepo: accountRepo,
 		logger:      logger,
@@ -33,7 +32,7 @@ func (u *RegisterUsecaseInterface) Register(username string, password string) er
 
 	if exists {
 		u.logger.Debug("Account already exists", zap.String("username", username))
-		return errors.New("account already exists")
+		return domain.ErrAccountAlreadyExists
 	}
 
 	// Hash password

@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 
 	"net/http"
 
@@ -24,7 +25,7 @@ func NewRegisterHandler(usecase *usecase.RegisterUsecaseInterface, logger *zap.L
 
 func (h *RegisterHandlerInterface) HandleRegister(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodPost {
-		http.Error(w, domain.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, domain.MethodNotAllowedMessage)
 		return
 	}
 
@@ -32,7 +33,7 @@ func (h *RegisterHandlerInterface) HandleRegister(w http.ResponseWriter, r *http
 
 	// Decode the JSON body
 	if err := json.NewDecoder(r.Body).Decode(&loginData); err != nil {
-		http.Error(w, "Invalid JSON payload", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "Invalid JSON payload")
 		return
 	}
 
@@ -40,13 +41,17 @@ func (h *RegisterHandlerInterface) HandleRegister(w http.ResponseWriter, r *http
 	password := loginData.Password
 
 	if username == "" || password == "" {
-		http.Error(w, "Username and password are required", http.StatusBadRequest)
+		writeJSONError(w, http.StatusBadRequest, "Username and password are required")
 		return
 	}
 
 	if err := h.usecase.Register(username, password); err != nil {
-		w.WriteHeader(http.StatusForbidden)
-		w.Write([]byte(err.Error()))
+		if errors.Is(err, domain.ErrAccountAlreadyExists) {
+			writeJSONError(w, http.StatusConflict, "Account already exists")
+			return
+		}
+		h.logger.Error("Register failed", zap.String("username", username), zap.Error(err))
+		writeJSONError(w, http.StatusInternalServerError, domain.InternalServerErrorMessage)
 		return
 	}
 

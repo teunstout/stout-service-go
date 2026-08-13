@@ -23,27 +23,35 @@ func NewLogoutHandler(usecase *usecase.LogoutUsecaseInterface, logger *zap.Logge
 func (h *LogoutHandlerInterface) HandleLogout(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		h.logger.Debug("Method not allowed")
-		http.Error(w, domain.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, domain.MethodNotAllowedMessage)
 		return
 	}
 
 	sessionToken, err := r.Cookie("session_token")
 	if err != nil {
 		h.logger.Info("Someone tried logging out without being logged in")
-		http.Error(w, domain.ForbiddenMessage, http.StatusForbidden)
+		writeJSONError(w, http.StatusForbidden, domain.ForbiddenMessage)
 		return
 	}
 
 	csrfToken := r.Header.Get("x-csrf-token")
 	if csrfToken == "" {
 		h.logger.Warn("Session token without x-csrf-token")
-		http.Error(w, domain.ForbiddenMessage, http.StatusForbidden)
+		writeJSONError(w, http.StatusForbidden, domain.ForbiddenMessage)
 		return
 	}
 
 	logoutAllDevices := r.URL.Query().Get("all_devices") == "true"
 
 	h.usecase.Logout(sessionToken.Value, csrfToken, logoutAllDevices)
+
+	http.SetCookie(w, &http.Cookie{
+		Name:     "session_token",
+		Value:    "",
+		Path:     "/",
+		MaxAge:   -1,
+		HttpOnly: true,
+	})
 
 	w.WriteHeader(http.StatusOK)
 	w.Write([]byte("Minion logged out successfully"))
