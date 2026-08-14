@@ -10,6 +10,7 @@ import (
 	logruslogger "stout.dev/jisho/internal/adapters/logger"
 	jishoclient "stout.dev/jisho/internal/external/jishoClient"
 	"stout.dev/jisho/internal/handler"
+	"stout.dev/jisho/internal/middleware"
 	"stout.dev/jisho/internal/repository"
 	"stout.dev/jisho/internal/usecase"
 )
@@ -50,8 +51,7 @@ func main() {
 	jishoUsecase := usecase.NewJishoUsecase(jishoClient, jishoRepository, logger)
 	jishoHandler := handler.NewJishoHandler(jishoUsecase, logger)
 
-	// mux.HandleFunc("/v1/search", middleware.AuthMiddleware(jishoHandler.SearchJisho, logger, verifyKey))
-	mux.HandleFunc("/v1/search", func(w http.ResponseWriter, r *http.Request) { jishoHandler.SearchJisho(w, r) })
+	mux.HandleFunc("/v1/search", middleware.AuthMiddleware(jishoHandler.SearchJisho, logger, verifyKey))
 	http.ListenAndServe(":8080", mux)
 	logger.Info("Server ready and listening!", nil)
 }

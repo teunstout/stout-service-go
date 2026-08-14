@@ -23,7 +23,7 @@ func JwksHandler(usecase *usecase.JwksUsecaseInterface, logger *zap.Logger) *Jwk
 
 func (h *JwksHandlerInterface) HandleJwksKeys(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		w.WriteHeader(http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, domain.MethodNotAllowedMessage)
 		return
 	}
 
@@ -32,7 +32,7 @@ func (h *JwksHandlerInterface) HandleJwksKeys(w http.ResponseWriter, r *http.Req
 	jsonResponse, err := json.Marshal(jwks)
 	if err != nil {
 		h.logger.Info("Creating Json response failed", zap.Any("body", jwks))
-		http.Error(w, domain.InternalServerErrorMessage, http.StatusConflict)
+		writeJSONError(w, http.StatusInternalServerError, domain.InternalServerErrorMessage)
 		return
 	}
 

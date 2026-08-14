@@ -22,19 +22,19 @@ func NewAuthenticateHandler(usecase *usecase.AuthenticationUsecaseInterface, log
 
 func (h *AuthenticateHandlerInterface) HandleAuthenticate(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
-		http.Error(w, domain.MethodNotAllowedMessage, http.StatusMethodNotAllowed)
+		writeJSONError(w, http.StatusMethodNotAllowed, domain.MethodNotAllowedMessage)
 		return
 	}
 
 	sessionToken, err := r.Cookie("session_token")
 	if err != nil {
-		http.Error(w, domain.UnauthorizedMessage, http.StatusUnauthorized)
+		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)
 		return
 	}
 
 	csrfToken := r.Header.Get("x-csrf-token")
 	if csrfToken == "" {
-		http.Error(w, domain.UnauthorizedMessage, http.StatusUnauthorized)
+		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)
 		return
 	}
 
@@ -44,6 +44,8 @@ func (h *AuthenticateHandlerInterface) HandleAuthenticate(w http.ResponseWriter,
 			zap.String("csrfToken", csrfToken),
 			zap.Error(err),
 		)
+		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)
+		return
 	}
 
 	w.WriteHeader(http.StatusOK)

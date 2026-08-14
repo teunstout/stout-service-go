@@ -8,12 +8,12 @@ import (
 )
 
 type LogoutUsecaseInterface struct {
-	sessionRepo *repository.SessionTokenRepositoryInterface
-	csrfRepo    *repository.CsrfRepositoryInterface
+	sessionRepo repository.SessionTokenRepository
+	csrfRepo    repository.CsrfRepository
 	logger      *zap.Logger
 }
 
-func NewLogoutUsecase(sessionRepo *repository.SessionTokenRepositoryInterface, csrfRepo *repository.CsrfRepositoryInterface, logger *zap.Logger) *LogoutUsecaseInterface {
+func NewLogoutUsecase(sessionRepo repository.SessionTokenRepository, csrfRepo repository.CsrfRepository, logger *zap.Logger) *LogoutUsecaseInterface {
 	return &LogoutUsecaseInterface{
 		sessionRepo: sessionRepo,
 		csrfRepo:    csrfRepo,

@@ -1,12 +1,14 @@
 package main
 
 import (
+	"context"
 	"crypto/rsa"
 	"log"
 	"net/http"
 	"os"
 
 	"github.com/golang-jwt/jwt/v5"
+	"github.com/jackc/pgx/v5/pgxpool"
 	"go.uber.org/zap"
 	"stout.dev/idp/internal/handler"
 	"stout.dev/idp/internal/repository"
@@ -56,9 +58,16 @@ func main() {
 	verifyKey, err = jwt.ParseRSAPublicKeyFromPEM(verifyBytes)
 	fatal(err)
 
-	accountRepo := repository.NewAccountRepository(connString, logger)
-	sessionRepo := repository.NewSessionTokenRepository(connString, logger)
-	csrfRepo := repository.NewCsrfRepository(connString, logger)
+	pool, err := pgxpool.New(context.Background(), connString)
+	fatal(err)
+	defer pool.Close()
+	if err := pool.Ping(context.Background()); err != nil {
+		log.Fatal(err)
+	}
+
+	accountRepo := repository.NewAccountRepository(pool, logger)
+	sessionRepo := repository.NewSessionTokenRepository(pool, logger)
+	csrfRepo := repository.NewCsrfRepository(pool, logger)
 
 	authUsecase := usecase.NewAuthenticationUsecase(sessionRepo, csrfRepo, logger)
 	loginUsecase := usecase.NewLoginUsecase(accountRepo, sessionRepo, csrfRepo, logger, signKey)
@@ -68,10 +77,14 @@ func main() {
 
 	authHandler := handler.NewAuthenticateHandler(authUsecase, logger)
 	registerHandler := handler.NewRegisterHandler(registerUsecase, logger)
-	loginHandler := handler.NewLoginHandler(loginUsecase, logger)
+	loginHandler := handler.NewLoginHandler(loginUsecase, logger, env != "")
 	logoutHandler := handler.NewLogoutHandler(logoutUsecase, logger)
 	restrictedHandler := handler.NewRestrictedHandler(authUsecase, logger, verifyKey)
 	jwksHandler := handler.JwksHandler(jwksUsecase, logger)
+
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
 
 	http.HandleFunc("/v1/register", registerHandler.HandleRegister)
 	http.HandleFunc("/v1/login", loginHandler.HandleLogin)
@@ -85,7 +98,7 @@ func main() {
 	http.HandleFunc("/v1/endpoints/restricted/example", restrictedHandler.RestrictedHandler)
 
 	log.Println("Server running on port 8080")
-	http.ListenAndServe(":8080", nil)
+	log.Fatal(http.ListenAndServe(":8080", nil))
 }
 
 func fatal(err error) {

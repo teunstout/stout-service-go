@@ -3,12 +3,12 @@ package handler
 import (
 	"crypto/rsa"
 	"encoding/json"
-	"fmt"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/golang-jwt/jwt/v5/request"
 	"go.uber.org/zap"
+	"stout.dev/idp/internal/domain"
 	"stout.dev/idp/internal/usecase"
 )
 
@@ -36,15 +36,15 @@ func (h *RestrictedHandlerInterface) RestrictedHandler(w http.ResponseWriter, r 
 
 	// If the token is missing or invalid, return error
 	if err != nil {
-		w.WriteHeader(http.StatusUnauthorized)
-		fmt.Fprintln(w, "Invalid token:", err)
+		h.logger.Info("Invalid token", zap.Error(err))
+		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)
 		return
 	}
 
 	h.logger.Info("Token", zap.Any("Claims", token.Claims.(*jwt.MapClaims)))
 	jsonRes, err := json.Marshal(token.Claims.(*jwt.MapClaims))
 	if err != nil {
-		w.WriteHeader(http.StatusConflict)
+		writeJSONError(w, http.StatusInternalServerError, domain.InternalServerErrorMessage)
 		return
 	}
 

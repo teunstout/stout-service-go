@@ -15,7 +15,7 @@ type JishoUsecaseInterface struct {
 }
 
 func NewJishoUsecase(c *jishoclient.JishoClientInterface, r *repository.JishoRepositoryInterface, l domain.Logger) *JishoUsecaseInterface {
-	return &JishoUsecaseInterface{client: c, logger: l}
+	return &JishoUsecaseInterface{client: c, repository: r, logger: l}
 }
 
 func (u *JishoUsecaseInterface) SearchJisho(keyword string, ctx context.Context) (*jishoclient.JishoResponse, error) {
@@ -31,8 +31,9 @@ func (u *JishoUsecaseInterface) SearchJisho(keyword string, ctx context.Context)
 
 func (u *JishoUsecaseInterface) saveSearchHistory(keyword string, ctx context.Context) {
 	mid, ok := ctx.Value("mid").(int32)
-	if ok {
+	if !ok {
 		u.logger.Debug("No Member ID found in context, skipping search history save", nil)
-		u.repository.SaveSearchHistory(mid, keyword)
+		return
 	}
+	u.repository.SaveSearchHistory(mid, keyword)
 }

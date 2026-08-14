@@ -8,12 +8,12 @@ import (
 )
 
 type AuthenticationUsecaseInterface struct {
-	sessionRepo *repository.SessionTokenRepositoryInterface
-	csrfRepo    *repository.CsrfRepositoryInterface
+	sessionRepo repository.SessionTokenRepository
+	csrfRepo    repository.CsrfRepository
 	logger      *zap.Logger
 }
 
-func NewAuthenticationUsecase(sessionRepo *repository.SessionTokenRepositoryInterface, csrfRepo *repository.CsrfRepositoryInterface, logger *zap.Logger) *AuthenticationUsecaseInterface {
+func NewAuthenticationUsecase(sessionRepo repository.SessionTokenRepository, csrfRepo repository.CsrfRepository, logger *zap.Logger) *AuthenticationUsecaseInterface {
 	return &AuthenticationUsecaseInterface{
 		sessionRepo: sessionRepo,
 		csrfRepo:    csrfRepo,
