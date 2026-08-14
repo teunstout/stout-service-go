@@ -32,10 +32,18 @@ These are curls used for most of the endpoints. Please be aware that these might
 
 #### Register
 
-Returns `201` on success, `400` for a missing/invalid body, or `409` (`{"error":"Account already exists"}`) if the username is taken.
+Returns `201` on success, `400` for a missing/invalid body, or `409` (`{"error":"Account already exists"}`) if the username is taken. This is how accounts get created — there is no signup UI in the frontend by design, so creating an account means running this curl (or inserting into `accounts` directly).
 
 ```bash
 curl -i -X POST http://localhost:8080/v1/register \
+  -H "Content-Type: application/json" \
+  -d '{"username":"golang","password":"golang"}'
+```
+
+Via Docker Compose (through nginx, prefixed with `/idp-service` — see [above](#via-the-nginx-gateway)):
+
+```bash
+curl -i -X POST http://localhost:8080/idp-service/v1/register \
   -H "Content-Type: application/json" \
   -d '{"username":"golang","password":"golang"}'
 ```
