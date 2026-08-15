@@ -1,0 +1,13 @@
+{
+  "Servers": {
+    "1": {
+      "Name": "stout postgres",
+      "Group": "Servers",
+      "Host": "postgres",
+      "Port": 5432,
+      "MaintenanceDB": "production",
+      "Username": "golang",
+      "SSLMode": "disable"
+    }
+  }
+}
