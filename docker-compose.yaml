@@ -88,6 +88,24 @@ services:
     networks:
       - stout-isolated
 
+  pgadmin:
+    image: dpage/pgadmin4:latest
+    container_name: pgadmin
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGADMIN_DEFAULT_EMAIL: ${PGADMIN_DEFAULT_EMAIL}
+      PGADMIN_DEFAULT_PASSWORD: ${PGADMIN_DEFAULT_PASSWORD}
+    volumes:
+      - ./pgadmin/servers.json:/pgadmin4/servers.json:ro
+    ports:
+      - "5050:80"
+    networks:
+      - stout-isolated # needed to reach the `postgres` hostname
+      - stout-public # exposes pgAdmin outside docker, same mechanism as nginx below
+
   nginx:
     build: ./nginx
     container_name: nginx
