@@ -65,8 +65,12 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      rsa-key-generator:
+        condition: service_completed_successfully
     environment:
       CONNECTION_STRING: "user=golang password=golang host=postgres port=5432 dbname=production sslmode=disable"
+    volumes:
+      - rsa_keys:/app/keys:ro
     networks:
       - stout-isolated
 

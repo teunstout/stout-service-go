@@ -12,7 +12,6 @@ EXPOSE 8080
 
 WORKDIR /app
 COPY --from=builder /build/content-service .
-COPY --from=builder /build/internal/app/assets ./assets
 
 USER 1000:1000
 
