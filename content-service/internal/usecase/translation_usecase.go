@@ -22,3 +22,11 @@ func (u *TranslationUsecase) SyncList(
 ) (domain.SyncListResult, error) {
 	return u.repo.SyncList(ctx, accountID, req.ID, req.Name, req.Entries)
 }
+
+func (u *TranslationUsecase) GetLists(ctx context.Context, accountID int32) (domain.GetListsResult, error) {
+	lists, err := u.repo.GetLists(ctx, accountID)
+	if err != nil {
+		return domain.GetListsResult{}, err
+	}
+	return domain.GetListsResult{Lists: lists}, nil
+}

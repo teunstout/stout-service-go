@@ -52,3 +52,26 @@ func (h *TranslationHandler) HandleSyncList(w http.ResponseWriter, r *http.Reque
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(result)
 }
+
+func (h *TranslationHandler) HandleGetLists(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		writeJSONError(w, http.StatusMethodNotAllowed, domain.MethodNotAllowedMessage)
+		return
+	}
+
+	accountID, ok := middleware.AccountIDFromContext(r.Context())
+	if !ok {
+		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)
+		return
+	}
+
+	result, err := h.usecase.GetLists(r.Context(), accountID)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, domain.InternalServerErrorMessage)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(result)
+}
