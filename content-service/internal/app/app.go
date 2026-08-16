@@ -38,6 +38,10 @@ func NewApp() {
 		"/v1/content/translation-lists/sync",
 		middleware.AuthMiddleware(translationHandler.HandleSyncList, verifyKey),
 	)
+	http.HandleFunc(
+		"/v1/content/translation-lists",
+		middleware.AuthMiddleware(translationHandler.HandleGetLists, verifyKey),
+	)
 
 	log.Println("Started on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))

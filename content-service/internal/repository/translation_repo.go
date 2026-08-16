@@ -44,9 +44,9 @@ func (r *TranslationRepository) SyncList(
 
 	for _, entry := range entries {
 		if _, err := tx.Exec(ctx, `
-			INSERT INTO translation (list_id, original_html, translation_html)
-			VALUES ($1, $2, $3)
-		`, resolvedID, entry.OriginalHTML, entry.TranslationHTML); err != nil {
+			INSERT INTO translation (list_id, original_html, translation_html, created_at)
+			VALUES ($1, $2, $3, $4)
+		`, resolvedID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt); err != nil {
 			return domain.SyncListResult{}, err
 		}
 	}
@@ -85,4 +85,63 @@ func resolveListID(
 		INSERT INTO translation_list (account_id, name) VALUES ($1, $2) RETURNING id
 	`, accountID, name).Scan(&newID)
 	return newID, err
+}
+
+// GetLists returns every list owned by accountID, each with its entries attached. Always
+// returns a non-nil (possibly empty) slice so it serializes to `[]`, not JSON null.
+func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) ([]domain.TranslationListOutput, error) {
+	rows, err := r.pool.Query(ctx, `
+		SELECT id, name, created_at FROM translation_list WHERE account_id = $1 ORDER BY id
+	`, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	lists := []domain.TranslationListOutput{}
+	listIDs := []int32{}
+	listIndexByID := map[int32]int{}
+	for rows.Next() {
+		var list domain.TranslationListOutput
+		if err := rows.Scan(&list.ID, &list.Name, &list.CreatedAt); err != nil {
+			return nil, err
+		}
+		list.Entries = []domain.TranslationEntryOutput{}
+		listIndexByID[list.ID] = len(lists)
+		lists = append(lists, list)
+		listIDs = append(listIDs, list.ID)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	if len(listIDs) == 0 {
+		return lists, nil
+	}
+
+	// list_id is only ever populated from listIDs above, which is already scoped to accountID.
+	entryRows, err := r.pool.Query(ctx, `
+		SELECT id, list_id, original_html, translation_html, created_at
+		FROM translation
+		WHERE list_id = ANY($1)
+		ORDER BY created_at ASC, id ASC
+	`, listIDs)
+	if err != nil {
+		return nil, err
+	}
+	defer entryRows.Close()
+
+	for entryRows.Next() {
+		var listID int32
+		var entry domain.TranslationEntryOutput
+		if err := entryRows.Scan(&entry.ID, &listID, &entry.OriginalHTML, &entry.TranslationHTML, &entry.CreatedAt); err != nil {
+			return nil, err
+		}
+		idx := listIndexByID[listID]
+		lists[idx].Entries = append(lists[idx].Entries, entry)
+	}
+	if err := entryRows.Err(); err != nil {
+		return nil, err
+	}
+
+	return lists, nil
 }
