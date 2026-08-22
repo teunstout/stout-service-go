@@ -145,3 +145,38 @@ func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) (
 
 	return lists, nil
 }
+
+// DeleteList removes a list and its entries if listID is owned by accountID. Returns
+// false, nil (not an error) if no such list exists for this account — the caller may be
+// retrying a delete that already succeeded, or racing another delete of the same list.
+func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32, listID int32) (bool, error) {
+	tx, err := r.pool.Begin(ctx)
+	if err != nil {
+		return false, err
+	}
+	defer tx.Rollback(ctx)
+
+	var owned bool
+	err = tx.QueryRow(ctx, `
+		SELECT EXISTS(SELECT 1 FROM translation_list WHERE id = $1 AND account_id = $2)
+	`, listID, accountID).Scan(&owned)
+	if err != nil {
+		return false, err
+	}
+	if !owned {
+		return false, nil
+	}
+
+	// translation.list_id has no ON DELETE CASCADE, so entries must go first.
+	if _, err := tx.Exec(ctx, `DELETE FROM translation WHERE list_id = $1`, listID); err != nil {
+		return false, err
+	}
+	if _, err := tx.Exec(ctx, `DELETE FROM translation_list WHERE id = $1`, listID); err != nil {
+		return false, err
+	}
+
+	if err := tx.Commit(ctx); err != nil {
+		return false, err
+	}
+	return true, nil
+}

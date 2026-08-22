@@ -30,3 +30,7 @@ func (u *TranslationUsecase) GetLists(ctx context.Context, accountID int32) (dom
 	}
 	return domain.GetListsResult{Lists: lists}, nil
 }
+
+func (u *TranslationUsecase) DeleteList(ctx context.Context, accountID int32, listID int32) (bool, error) {
+	return u.repo.DeleteList(ctx, accountID, listID)
+}

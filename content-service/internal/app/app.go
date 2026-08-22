@@ -42,6 +42,10 @@ func NewApp() {
 		"/v1/content/translation-lists",
 		middleware.AuthMiddleware(translationHandler.HandleGetLists, verifyKey),
 	)
+	http.HandleFunc(
+		"/v1/content/translation-lists/delete",
+		middleware.AuthMiddleware(translationHandler.HandleDeleteList, verifyKey),
+	)
 
 	log.Println("Started on http://localhost:8080")
 	log.Fatal(http.ListenAndServe(":8080", nil))
