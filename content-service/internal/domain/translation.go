@@ -37,3 +37,11 @@ type TranslationListOutput struct {
 type GetListsResult struct {
 	Lists []TranslationListOutput `json:"lists"`
 }
+
+type DeleteListRequest struct {
+	ID int32 `json:"id"`
+}
+
+type DeleteListResult struct {
+	ID int32 `json:"id"`
+}
