@@ -17,9 +17,8 @@ func NewTranslationRepository(pool *pgxpool.Pool) *TranslationRepository {
 }
 
 // SyncList resolves listID to a translation_list row owned by accountID (updating its name,
-// or creating a new list if listID is nil or belongs to someone else/no one), then replaces
-// all of that list's translation rows with entries. Runs as a single transaction so a
-// mid-failure can't leave the list without any entries.
+// or creating a new list if listID is nil or belongs to someone else/no one), then upserts each
+// entry by id. Runs as a single transaction so a mid-failure can't leave the list half-synced.
 func (r *TranslationRepository) SyncList(
 	ctx context.Context,
 	accountID int32,
@@ -38,24 +37,59 @@ func (r *TranslationRepository) SyncList(
 		return domain.SyncListResult{}, err
 	}
 
-	if _, err := tx.Exec(ctx, `DELETE FROM translation WHERE list_id = $1`, resolvedID); err != nil {
-		return domain.SyncListResult{}, err
-	}
-
-	for _, entry := range entries {
-		if _, err := tx.Exec(ctx, `
-			INSERT INTO translation (list_id, original_html, translation_html, created_at)
-			VALUES ($1, $2, $3, $4)
-		`, resolvedID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt); err != nil {
+	// Built in request order and returned that way - the frontend zips this back onto its own
+	// entries array by position to learn each new entry's assigned id.
+	results := make([]domain.SyncEntryResult, len(entries))
+	for i, entry := range entries {
+		entryID, err := upsertEntry(ctx, tx, accountID, resolvedID, entry)
+		if err != nil {
 			return domain.SyncListResult{}, err
 		}
+		results[i] = domain.SyncEntryResult{ID: entryID}
 	}
 
 	if err := tx.Commit(ctx); err != nil {
 		return domain.SyncListResult{}, err
 	}
 
-	return domain.SyncListResult{ID: resolvedID, Name: name, EntryCount: len(entries)}, nil
+	return domain.SyncListResult{ID: resolvedID, Name: name, Entries: results}, nil
+}
+
+// upsertEntry updates entry.ID's row in place - moving it to listID and overwriting its content,
+// which is what makes a cross-list move "just work" as a plain field update - if it exists and
+// belongs to accountID. A nil id, or one that's stale/foreign (0 rows matched), collapses into
+// inserting a new row into listID instead, same fallback convention resolveListID uses for a
+// stale/foreign listID. The ownership check happens on the pre-update row via the WHERE clause,
+// scoped through listID (itself already ownership-checked by resolveListID above this call) -
+// so one account can never redirect another account's entry into a list of its own choosing.
+func upsertEntry(
+	ctx context.Context,
+	tx pgx.Tx,
+	accountID int32,
+	listID int32,
+	entry domain.TranslationEntryInput,
+) (int32, error) {
+	if entry.ID != nil {
+		tag, err := tx.Exec(ctx, `
+			UPDATE translation
+			SET list_id = $1, original_html = $2, translation_html = $3, created_at = $4, updated_at = $5
+			WHERE id = $6 AND list_id IN (SELECT id FROM translation_list WHERE account_id = $7)
+		`, listID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt, entry.UpdatedAt, *entry.ID, accountID)
+		if err != nil {
+			return 0, err
+		}
+		if tag.RowsAffected() == 1 {
+			return *entry.ID, nil
+		}
+	}
+
+	var newID int32
+	err := tx.QueryRow(ctx, `
+		INSERT INTO translation (list_id, original_html, translation_html, created_at, updated_at)
+		VALUES ($1, $2, $3, $4, $5)
+		RETURNING id
+	`, listID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt, entry.UpdatedAt).Scan(&newID)
+	return newID, err
 }
 
 // resolveListID updates the name of the caller's own list if listID is set and matches an
@@ -120,7 +154,7 @@ func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) (
 
 	// list_id is only ever populated from listIDs above, which is already scoped to accountID.
 	entryRows, err := r.pool.Query(ctx, `
-		SELECT id, list_id, original_html, translation_html, created_at
+		SELECT id, list_id, original_html, translation_html, created_at, updated_at
 		FROM translation
 		WHERE list_id = ANY($1)
 		ORDER BY created_at ASC, id ASC
@@ -133,7 +167,9 @@ func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) (
 	for entryRows.Next() {
 		var listID int32
 		var entry domain.TranslationEntryOutput
-		if err := entryRows.Scan(&entry.ID, &listID, &entry.OriginalHTML, &entry.TranslationHTML, &entry.CreatedAt); err != nil {
+		if err := entryRows.Scan(
+			&entry.ID, &listID, &entry.OriginalHTML, &entry.TranslationHTML, &entry.CreatedAt, &entry.UpdatedAt,
+		); err != nil {
 			return nil, err
 		}
 		idx := listIndexByID[listID]
@@ -179,4 +215,34 @@ func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32,
 		return false, err
 	}
 	return true, nil
+}
+
+// DeleteEntries removes exactly the entries in ids that belong to accountID (scoped through
+// list_id, same ownership pattern as everywhere else in this file), returning the ids that were
+// actually deleted. Foreign or already-gone ids are silently skipped rather than erroring - the
+// caller may be retrying a delete that already succeeded, or racing another device's sync.
+func (r *TranslationRepository) DeleteEntries(ctx context.Context, accountID int32, ids []int32) ([]int32, error) {
+	rows, err := r.pool.Query(ctx, `
+		DELETE FROM translation
+		WHERE id = ANY($1) AND list_id IN (SELECT id FROM translation_list WHERE account_id = $2)
+		RETURNING id
+	`, ids, accountID)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	deletedIDs := []int32{}
+	for rows.Next() {
+		var id int32
+		if err := rows.Scan(&id); err != nil {
+			return nil, err
+		}
+		deletedIDs = append(deletedIDs, id)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return deletedIDs, nil
 }

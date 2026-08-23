@@ -108,3 +108,32 @@ func (h *TranslationHandler) HandleDeleteList(w http.ResponseWriter, r *http.Req
 	w.WriteHeader(http.StatusOK)
 	json.NewEncoder(w).Encode(domain.DeleteListResult{ID: req.ID})
 }
+
+func (h *TranslationHandler) HandleDeleteEntries(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		writeJSONError(w, http.StatusMethodNotAllowed, domain.MethodNotAllowedMessage)
+		return
+	}
+
+	accountID, ok := middleware.AccountIDFromContext(r.Context())
+	if !ok {
+		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)
+		return
+	}
+
+	var req domain.DeleteEntriesRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		writeJSONError(w, http.StatusBadRequest, "Invalid JSON payload")
+		return
+	}
+
+	deletedIDs, err := h.usecase.DeleteEntries(r.Context(), accountID, req.IDs)
+	if err != nil {
+		writeJSONError(w, http.StatusInternalServerError, domain.InternalServerErrorMessage)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusOK)
+	json.NewEncoder(w).Encode(domain.DeleteEntriesResult{DeletedIDs: deletedIDs})
+}
