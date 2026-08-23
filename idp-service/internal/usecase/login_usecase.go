@@ -48,7 +48,7 @@ func (u *LoginUsecaseInterface) Login(username string, password string) (domain.
 	}
 
 	// Create session token and csrf token
-	tokenExpiration := time.Now().Add(time.Hour * 1)
+	tokenExpiration := time.Now().Add(time.Hour * 6)
 	sessionToken := domain.GenerateSecureToken()
 	if err := u.sessionRepo.CreateSessionToken(sessionToken, account.ID, tokenExpiration); err != nil {
 		u.logger.Debug("Error creating session token", zap.String("username", username), zap.Error(err))
