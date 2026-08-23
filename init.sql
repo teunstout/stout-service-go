@@ -71,7 +71,8 @@ create table
         list_id integer not null references translation_list (id),
         original_html text not null,
         translation_html text,
-        created_at timestamp not null default now ()
+        created_at timestamp not null default now (),
+        updated_at timestamp not null default now ()
     );
 
 create index if not exists idx_translation_list_id on translation (list_id);
