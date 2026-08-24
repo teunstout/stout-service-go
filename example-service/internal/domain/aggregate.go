@@ -2,19 +2,16 @@ package domain
 
 import "fmt"
 
-// Aggregate represents a cluster of domain objects treated as a single unit.
 type Aggregate struct {
 	ID       string
 	Entities []Entity
 }
 
-// Entity represents a part of the aggregate.
 type Entity struct {
 	ID   string
 	Name string
 }
 
-// NewAggregate creates a new aggregate.
 func NewAggregate(id string, entities []Entity) *Aggregate {
 	return &Aggregate{
 		ID:       id,
@@ -22,7 +19,6 @@ func NewAggregate(id string, entities []Entity) *Aggregate {
 	}
 }
 
-// Example usage of Aggregate.
 func ExampleAggregate() {
 	entities := []Entity{
 		{ID: "1", Name: "Entity1"},

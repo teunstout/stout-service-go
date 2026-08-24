@@ -35,7 +35,7 @@ func main() {
 	pubKeyPath := "/app/keys/app.rsa.pub"
 	if _, err := os.Stat(pubKeyPath); os.IsNotExist(err) {
 		logger.Warn("Public key not found, using default path", nil)
-		pubKeyPath = `../app.rsa.pub` // This is from the root of jisho-service
+		pubKeyPath = `../app.rsa.pub`
 	}
 
 	verifyBytes, err := os.ReadFile(pubKeyPath)

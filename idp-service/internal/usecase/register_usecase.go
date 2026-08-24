@@ -35,7 +35,6 @@ func (u *RegisterUsecaseInterface) Register(username string, password string) er
 		return domain.ErrAccountAlreadyExists
 	}
 
-	// Hash password
 	hashedPassword, err := domain.HashPassword(password)
 	if err != nil {
 		u.logger.Error("Error hashing password", zap.String("username", username), zap.Error(err))

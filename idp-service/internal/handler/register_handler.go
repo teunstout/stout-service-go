@@ -31,7 +31,6 @@ func (h *RegisterHandlerInterface) HandleRegister(w http.ResponseWriter, r *http
 
 	var loginData domain.LoginBody
 
-	// Decode the JSON body
 	if err := json.NewDecoder(r.Body).Decode(&loginData); err != nil {
 		writeJSONError(w, http.StatusBadRequest, "Invalid JSON payload")
 		return

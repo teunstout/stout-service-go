@@ -15,8 +15,6 @@ type contextKey string
 
 const accountIDContextKey contextKey = "accountID"
 
-// AuthMiddleware requires a valid RS256-signed Bearer JWT (issued by idp-service) and makes
-// the account id from its "sub" claim available to the wrapped handler via AccountIDFromContext.
 func AuthMiddleware(next http.HandlerFunc, verifyKey *rsa.PublicKey) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		authHeader := r.Header.Get("Authorization")
@@ -44,7 +42,7 @@ func AuthMiddleware(next http.HandlerFunc, verifyKey *rsa.PublicKey) http.Handle
 			return
 		}
 
-		sub, ok := claims["sub"].(float64) // JWT numbers decode as float64
+		sub, ok := claims["sub"].(float64)
 		if !ok {
 			writeUnauthorized(w)
 			return

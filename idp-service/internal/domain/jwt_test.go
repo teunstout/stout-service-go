@@ -72,9 +72,6 @@ func TestCreateJwtSubIsJSONNumber(t *testing.T) {
 		t.Fatalf("CreateJwt returned error: %v", err)
 	}
 
-	// jisho-service's AuthMiddleware parses claims generically as
-	// jwt.MapClaims and requires claims["sub"] to type-assert to float64 -
-	// verify that contract still holds after switching CreateJwt to AppClaims.
 	mapClaims := jwt.MapClaims{}
 	_, err = jwt.ParseWithClaims(tokenString, mapClaims, func(token *jwt.Token) (interface{}, error) {
 		return &key.PublicKey, nil

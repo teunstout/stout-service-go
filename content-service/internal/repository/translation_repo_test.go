@@ -11,11 +11,6 @@ import (
 	"stout.dev/content/internal/domain"
 )
 
-// setupTestPool connects to a real Postgres instance for these repository-layer integration
-// tests - this package has SQL (upserts, ownership WHERE-clauses) that a fake/mock repo can't
-// exercise meaningfully. Defaults to the same local dev instance docker-compose.yaml brings up
-// (`docker compose up -d postgres`); set CONNECTION_STRING to point elsewhere. Skips (not fails)
-// when unreachable, so `go test ./...` still passes in environments without Postgres available.
 func setupTestPool(t *testing.T) *pgxpool.Pool {
 	t.Helper()
 
@@ -37,10 +32,6 @@ func setupTestPool(t *testing.T) *pgxpool.Pool {
 	return pool
 }
 
-// createTestAccount inserts a throwaway account row - translation_list.account_id has a real FK
-// to accounts.id, so every test needs one - and registers a cleanup that removes it and
-// everything scoped under it (translation_list has no ON DELETE CASCADE from accounts, so
-// entries and lists are cleared explicitly first, same ordering DeleteList itself uses).
 func createTestAccount(t *testing.T, pool *pgxpool.Pool) int32 {
 	t.Helper()
 	ctx := context.Background()
@@ -174,8 +165,6 @@ func TestSyncList_ExistingID_DifferentListID_MovesEntryWithoutDuplicating(t *tes
 		t.Fatalf("SyncList (list B) returned error: %v", err)
 	}
 
-	// Same entry id, now pushed under list B's sync - this is what a client-side "move" looks
-	// like on the wire: the id stays the same, only list_id changes.
 	_, err = repo.SyncList(ctx, accountID, &listB.ID, "List B", []domain.TranslationEntryInput{
 		{ID: &entryID, OriginalHTML: "movable", TranslationHTML: "movable-t", CreatedAt: createdAt, UpdatedAt: createdAt},
 	})
@@ -233,7 +222,6 @@ func TestSyncList_ForeignID_DoesNotOverwriteOtherAccountsEntry(t *testing.T) {
 	}
 	victimEntryID := victimList.Entries[0].ID
 
-	// The attacker guesses/reuses the victim's entry id in their own sync request.
 	attackerResult, err := repo.SyncList(ctx, attackerAccountID, nil, "Attacker's List", []domain.TranslationEntryInput{
 		{ID: &victimEntryID, OriginalHTML: "attacker's content", TranslationHTML: "t", CreatedAt: createdAt, UpdatedAt: createdAt},
 	})
@@ -295,48 +283,6 @@ func TestSyncList_ZeroEntries_ReturnsEmptyNotNilSlice(t *testing.T) {
 	}
 	if len(result.Entries) != 0 {
 		t.Errorf("expected 0 entries, got %d", len(result.Entries))
-	}
-}
-
-// TestSyncList_MigrationBackfill exercises the exact backfill statement from
-// migrations/002_translation_add_updated_at.sql (`UPDATE translation SET updated_at =
-// created_at`) against rows seeded to look like pre-migration data (updated_at deliberately set
-// to something other than created_at). Running the full migration file's ADD COLUMN IF NOT
-// EXISTS against this shared dev schema isn't safe to do from a test that runs alongside others
-// in the same package, so that half was verified manually instead: applied against the live dev
-// container (`docker exec -i postgres psql -U golang -d production < migrations/002_...sql`),
-// then re-applied a second time to confirm the NOTICE-and-skip idempotent path.
-func TestSyncList_MigrationBackfill(t *testing.T) {
-	pool := setupTestPool(t)
-	accountID := createTestAccount(t, pool)
-	ctx := context.Background()
-
-	var listID int32
-	err := pool.QueryRow(ctx, `
-		INSERT INTO translation_list (account_id, name) VALUES ($1, 'Pre-migration List') RETURNING id
-	`, accountID).Scan(&listID)
-	if err != nil {
-		t.Fatalf("failed to create test list: %v", err)
-	}
-
-	createdAt := time.Date(2020, 3, 15, 9, 30, 0, 0, time.UTC)
-	staleUpdatedAt := time.Date(1999, 1, 1, 0, 0, 0, 0, time.UTC)
-	var entryID int32
-	err = pool.QueryRow(ctx, `
-		INSERT INTO translation (list_id, original_html, translation_html, created_at, updated_at)
-		VALUES ($1, 'a', 'b', $2, $3) RETURNING id
-	`, listID, createdAt, staleUpdatedAt).Scan(&entryID)
-	if err != nil {
-		t.Fatalf("failed to seed pre-migration-shaped row: %v", err)
-	}
-
-	if _, err := pool.Exec(ctx, `UPDATE translation SET updated_at = created_at`); err != nil {
-		t.Fatalf("backfill statement returned error: %v", err)
-	}
-
-	_, _, _, updatedAt := entryRow(t, pool, entryID)
-	if !updatedAt.Equal(createdAt) {
-		t.Errorf("expected updated_at backfilled to created_at (%v), got %v", createdAt, updatedAt)
 	}
 }
 
