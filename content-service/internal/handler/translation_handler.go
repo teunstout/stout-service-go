@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"errors"
 	"net/http"
 	"strings"
 
@@ -44,6 +45,10 @@ func (h *TranslationHandler) HandleSyncList(w http.ResponseWriter, r *http.Reque
 
 	result, err := h.usecase.SyncList(r.Context(), accountID, req)
 	if err != nil {
+		if errors.Is(err, domain.ErrListNotFound) || errors.Is(err, domain.ErrEntryNotFound) {
+			writeJSONError(w, http.StatusConflict, err.Error())
+			return
+		}
 		writeJSONError(w, http.StatusInternalServerError, domain.InternalServerErrorMessage)
 		return
 	}

@@ -8,69 +8,46 @@ import (
 	"stout.dev/content/internal/domain"
 )
 
-type TranslationRepository struct {
+type TranslationRepositoryInterface struct {
 	pool *pgxpool.Pool
 }
 
-func NewTranslationRepository(pool *pgxpool.Pool) *TranslationRepository {
-	return &TranslationRepository{pool: pool}
+func NewTranslationRepository(pool *pgxpool.Pool) *TranslationRepositoryInterface {
+	return &TranslationRepositoryInterface{pool: pool}
 }
 
-func (r *TranslationRepository) SyncList(
-	ctx context.Context,
-	accountID int32,
-	listID *int32,
-	name string,
-	entries []domain.TranslationEntryInput,
-) (domain.SyncListResult, error) {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return domain.SyncListResult{}, err
-	}
-	defer tx.Rollback(ctx)
-
-	resolvedID, err := resolveListID(ctx, tx, accountID, listID, name)
-	if err != nil {
-		return domain.SyncListResult{}, err
-	}
-
-	results := make([]domain.SyncEntryResult, len(entries))
-	for i, entry := range entries {
-		entryID, err := upsertEntry(ctx, tx, accountID, resolvedID, entry)
-		if err != nil {
-			return domain.SyncListResult{}, err
-		}
-		results[i] = domain.SyncEntryResult{ID: entryID}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return domain.SyncListResult{}, err
-	}
-
-	return domain.SyncListResult{ID: resolvedID, Name: name, Entries: results}, nil
+// BeginTx starts a transaction for the usecase layer to orchestrate a multi-statement
+// sync (resolve list, then upsert each entry) atomically. The usecase layer never
+// touches the pool directly - this is the only way in.
+func (r *TranslationRepositoryInterface) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.Begin(ctx)
 }
 
-func upsertEntry(
+func UpdateTranslationEntry(
 	ctx context.Context,
 	tx pgx.Tx,
 	accountID int32,
 	listID int32,
+	entryID int32,
+	entry domain.TranslationEntryInput,
+) (int64, error) {
+	tag, err := tx.Exec(ctx, `
+		UPDATE translation
+		SET list_id = $1, original_html = $2, translation_html = $3, created_at = $4, updated_at = $5
+		WHERE id = $6 AND list_id IN (SELECT id FROM translation_list WHERE account_id = $7)
+	`, listID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt, entry.UpdatedAt, entryID, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func InsertTranslationEntry(
+	ctx context.Context,
+	tx pgx.Tx,
+	listID int32,
 	entry domain.TranslationEntryInput,
 ) (int32, error) {
-	if entry.ID != nil {
-		tag, err := tx.Exec(ctx, `
-			UPDATE translation
-			SET list_id = $1, original_html = $2, translation_html = $3, created_at = $4, updated_at = $5
-			WHERE id = $6 AND list_id IN (SELECT id FROM translation_list WHERE account_id = $7)
-		`, listID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt, entry.UpdatedAt, *entry.ID, accountID)
-		if err != nil {
-			return 0, err
-		}
-		if tag.RowsAffected() == 1 {
-			return *entry.ID, nil
-		}
-	}
-
 	var newID int32
 	err := tx.QueryRow(ctx, `
 		INSERT INTO translation (list_id, original_html, translation_html, created_at, updated_at)
@@ -80,25 +57,28 @@ func upsertEntry(
 	return newID, err
 }
 
-func resolveListID(
+func UpdateTranslationList(
 	ctx context.Context,
 	tx pgx.Tx,
 	accountID int32,
-	listID *int32,
+	listID int32,
+	name string,
+) (int64, error) {
+	tag, err := tx.Exec(ctx, `
+		UPDATE translation_list SET name = $1 WHERE id = $2 AND account_id = $3
+	`, name, listID, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func InsertTranslationList(
+	ctx context.Context,
+	tx pgx.Tx,
+	accountID int32,
 	name string,
 ) (int32, error) {
-	if listID != nil {
-		tag, err := tx.Exec(ctx, `
-			UPDATE translation_list SET name = $1 WHERE id = $2 AND account_id = $3
-		`, name, *listID, accountID)
-		if err != nil {
-			return 0, err
-		}
-		if tag.RowsAffected() == 1 {
-			return *listID, nil
-		}
-	}
-
 	var newID int32
 	err := tx.QueryRow(ctx, `
 		INSERT INTO translation_list (account_id, name) VALUES ($1, $2) RETURNING id
@@ -106,7 +86,7 @@ func resolveListID(
 	return newID, err
 }
 
-func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) ([]domain.TranslationListOutput, error) {
+func (r *TranslationRepositoryInterface) GetLists(ctx context.Context, accountID int32) ([]domain.TranslationListOutput, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, name, created_at FROM translation_list WHERE account_id = $1 ORDER BY id
 	`, accountID)
@@ -164,7 +144,7 @@ func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) (
 	return lists, nil
 }
 
-func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32, listID int32) (bool, error) {
+func (r *TranslationRepositoryInterface) DeleteList(ctx context.Context, accountID int32, listID int32) (bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -195,7 +175,7 @@ func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32,
 	return true, nil
 }
 
-func (r *TranslationRepository) DeleteEntries(ctx context.Context, accountID int32, ids []int32) ([]int32, error) {
+func (r *TranslationRepositoryInterface) DeleteEntries(ctx context.Context, accountID int32, ids []int32) ([]int32, error) {
 	rows, err := r.pool.Query(ctx, `
 		DELETE FROM translation
 		WHERE id = ANY($1) AND list_id IN (SELECT id FROM translation_list WHERE account_id = $2)
