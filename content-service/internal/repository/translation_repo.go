@@ -8,81 +8,46 @@ import (
 	"stout.dev/content/internal/domain"
 )
 
-type TranslationRepository struct {
+type TranslationRepositoryInterface struct {
 	pool *pgxpool.Pool
 }
 
-func NewTranslationRepository(pool *pgxpool.Pool) *TranslationRepository {
-	return &TranslationRepository{pool: pool}
+func NewTranslationRepository(pool *pgxpool.Pool) *TranslationRepositoryInterface {
+	return &TranslationRepositoryInterface{pool: pool}
 }
 
-// SyncList resolves listID to a translation_list row owned by accountID (updating its name,
-// or creating a new list if listID is nil or belongs to someone else/no one), then upserts each
-// entry by id. Runs as a single transaction so a mid-failure can't leave the list half-synced.
-func (r *TranslationRepository) SyncList(
-	ctx context.Context,
-	accountID int32,
-	listID *int32,
-	name string,
-	entries []domain.TranslationEntryInput,
-) (domain.SyncListResult, error) {
-	tx, err := r.pool.Begin(ctx)
-	if err != nil {
-		return domain.SyncListResult{}, err
-	}
-	defer tx.Rollback(ctx)
-
-	resolvedID, err := resolveListID(ctx, tx, accountID, listID, name)
-	if err != nil {
-		return domain.SyncListResult{}, err
-	}
-
-	// Built in request order and returned that way - the frontend zips this back onto its own
-	// entries array by position to learn each new entry's assigned id.
-	results := make([]domain.SyncEntryResult, len(entries))
-	for i, entry := range entries {
-		entryID, err := upsertEntry(ctx, tx, accountID, resolvedID, entry)
-		if err != nil {
-			return domain.SyncListResult{}, err
-		}
-		results[i] = domain.SyncEntryResult{ID: entryID}
-	}
-
-	if err := tx.Commit(ctx); err != nil {
-		return domain.SyncListResult{}, err
-	}
-
-	return domain.SyncListResult{ID: resolvedID, Name: name, Entries: results}, nil
+// BeginTx starts a transaction for the usecase layer to orchestrate a multi-statement
+// sync (resolve list, then upsert each entry) atomically. The usecase layer never
+// touches the pool directly - this is the only way in.
+func (r *TranslationRepositoryInterface) BeginTx(ctx context.Context) (pgx.Tx, error) {
+	return r.pool.Begin(ctx)
 }
 
-// upsertEntry updates entry.ID's row in place - moving it to listID and overwriting its content,
-// which is what makes a cross-list move "just work" as a plain field update - if it exists and
-// belongs to accountID. A nil id, or one that's stale/foreign (0 rows matched), collapses into
-// inserting a new row into listID instead, same fallback convention resolveListID uses for a
-// stale/foreign listID. The ownership check happens on the pre-update row via the WHERE clause,
-// scoped through listID (itself already ownership-checked by resolveListID above this call) -
-// so one account can never redirect another account's entry into a list of its own choosing.
-func upsertEntry(
+func UpdateTranslationEntry(
 	ctx context.Context,
 	tx pgx.Tx,
 	accountID int32,
 	listID int32,
+	entryID int32,
+	entry domain.TranslationEntryInput,
+) (int64, error) {
+	tag, err := tx.Exec(ctx, `
+		UPDATE translation
+		SET list_id = $1, original_html = $2, translation_html = $3, created_at = $4, updated_at = $5
+		WHERE id = $6 AND list_id IN (SELECT id FROM translation_list WHERE account_id = $7)
+	`, listID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt, entry.UpdatedAt, entryID, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func InsertTranslationEntry(
+	ctx context.Context,
+	tx pgx.Tx,
+	listID int32,
 	entry domain.TranslationEntryInput,
 ) (int32, error) {
-	if entry.ID != nil {
-		tag, err := tx.Exec(ctx, `
-			UPDATE translation
-			SET list_id = $1, original_html = $2, translation_html = $3, created_at = $4, updated_at = $5
-			WHERE id = $6 AND list_id IN (SELECT id FROM translation_list WHERE account_id = $7)
-		`, listID, entry.OriginalHTML, entry.TranslationHTML, entry.CreatedAt, entry.UpdatedAt, *entry.ID, accountID)
-		if err != nil {
-			return 0, err
-		}
-		if tag.RowsAffected() == 1 {
-			return *entry.ID, nil
-		}
-	}
-
 	var newID int32
 	err := tx.QueryRow(ctx, `
 		INSERT INTO translation (list_id, original_html, translation_html, created_at, updated_at)
@@ -92,28 +57,28 @@ func upsertEntry(
 	return newID, err
 }
 
-// resolveListID updates the name of the caller's own list if listID is set and matches an
-// account_id-scoped row, otherwise inserts a new list. A stale or foreign listID collapses
-// into the same "insert new" path as a nil listID (first sync) rather than erroring.
-func resolveListID(
+func UpdateTranslationList(
 	ctx context.Context,
 	tx pgx.Tx,
 	accountID int32,
-	listID *int32,
+	listID int32,
+	name string,
+) (int64, error) {
+	tag, err := tx.Exec(ctx, `
+		UPDATE translation_list SET name = $1 WHERE id = $2 AND account_id = $3
+	`, name, listID, accountID)
+	if err != nil {
+		return 0, err
+	}
+	return tag.RowsAffected(), nil
+}
+
+func InsertTranslationList(
+	ctx context.Context,
+	tx pgx.Tx,
+	accountID int32,
 	name string,
 ) (int32, error) {
-	if listID != nil {
-		tag, err := tx.Exec(ctx, `
-			UPDATE translation_list SET name = $1 WHERE id = $2 AND account_id = $3
-		`, name, *listID, accountID)
-		if err != nil {
-			return 0, err
-		}
-		if tag.RowsAffected() == 1 {
-			return *listID, nil
-		}
-	}
-
 	var newID int32
 	err := tx.QueryRow(ctx, `
 		INSERT INTO translation_list (account_id, name) VALUES ($1, $2) RETURNING id
@@ -121,9 +86,7 @@ func resolveListID(
 	return newID, err
 }
 
-// GetLists returns every list owned by accountID, each with its entries attached. Always
-// returns a non-nil (possibly empty) slice so it serializes to `[]`, not JSON null.
-func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) ([]domain.TranslationListOutput, error) {
+func (r *TranslationRepositoryInterface) GetLists(ctx context.Context, accountID int32) ([]domain.TranslationListOutput, error) {
 	rows, err := r.pool.Query(ctx, `
 		SELECT id, name, created_at FROM translation_list WHERE account_id = $1 ORDER BY id
 	`, accountID)
@@ -152,7 +115,6 @@ func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) (
 		return lists, nil
 	}
 
-	// list_id is only ever populated from listIDs above, which is already scoped to accountID.
 	entryRows, err := r.pool.Query(ctx, `
 		SELECT id, list_id, original_html, translation_html, created_at, updated_at
 		FROM translation
@@ -182,10 +144,7 @@ func (r *TranslationRepository) GetLists(ctx context.Context, accountID int32) (
 	return lists, nil
 }
 
-// DeleteList removes a list and its entries if listID is owned by accountID. Returns
-// false, nil (not an error) if no such list exists for this account — the caller may be
-// retrying a delete that already succeeded, or racing another delete of the same list.
-func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32, listID int32) (bool, error) {
+func (r *TranslationRepositoryInterface) DeleteList(ctx context.Context, accountID int32, listID int32) (bool, error) {
 	tx, err := r.pool.Begin(ctx)
 	if err != nil {
 		return false, err
@@ -203,7 +162,6 @@ func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32,
 		return false, nil
 	}
 
-	// translation.list_id has no ON DELETE CASCADE, so entries must go first.
 	if _, err := tx.Exec(ctx, `DELETE FROM translation WHERE list_id = $1`, listID); err != nil {
 		return false, err
 	}
@@ -217,11 +175,7 @@ func (r *TranslationRepository) DeleteList(ctx context.Context, accountID int32,
 	return true, nil
 }
 
-// DeleteEntries removes exactly the entries in ids that belong to accountID (scoped through
-// list_id, same ownership pattern as everywhere else in this file), returning the ids that were
-// actually deleted. Foreign or already-gone ids are silently skipped rather than erroring - the
-// caller may be retrying a delete that already succeeded, or racing another device's sync.
-func (r *TranslationRepository) DeleteEntries(ctx context.Context, accountID int32, ids []int32) ([]int32, error) {
+func (r *TranslationRepositoryInterface) DeleteEntries(ctx context.Context, accountID int32, ids []int32) ([]int32, error) {
 	rows, err := r.pool.Query(ctx, `
 		DELETE FROM translation
 		WHERE id = ANY($1) AND list_id IN (SELECT id FROM translation_list WHERE account_id = $2)

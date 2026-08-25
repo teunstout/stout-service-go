@@ -47,8 +47,7 @@ func (u *LoginUsecaseInterface) Login(username string, password string) (domain.
 		return domain.LoginResult{}, errors.New("Invalid username or password")
 	}
 
-	// Create session token and csrf token
-	tokenExpiration := time.Now().Add(time.Hour * 6)
+	tokenExpiration := time.Now().Add(time.Hour * 1)
 	sessionToken := domain.GenerateSecureToken()
 	if err := u.sessionRepo.CreateSessionToken(sessionToken, account.ID, tokenExpiration); err != nil {
 		u.logger.Debug("Error creating session token", zap.String("username", username), zap.Error(err))
@@ -61,7 +60,6 @@ func (u *LoginUsecaseInterface) Login(username string, password string) (domain.
 		return domain.LoginResult{}, errors.New("Error creating csrf token")
 	}
 
-	// Create JWT token
 	jwt, err := domain.CreateJwt(account.ID, u.privateKey)
 	if err != nil {
 		u.logger.Warn("Error creating jwt", zap.String("username", username), zap.Error(err))

@@ -27,14 +27,11 @@ func NewRestrictedHandler(usecase *usecase.AuthenticationUsecaseInterface, logge
 }
 
 func (h *RestrictedHandlerInterface) RestrictedHandler(w http.ResponseWriter, r *http.Request) {
-	// Get token from request
 	token, err := request.ParseFromRequest(r, request.OAuth2Extractor, func(token *jwt.Token) (interface{}, error) {
-		// since we only use the one private key to sign the tokens,
-		// we also only use its public counter part to verify
+
 		return h.verifyKey, nil
 	}, request.WithClaims(&jwt.MapClaims{}))
 
-	// If the token is missing or invalid, return error
 	if err != nil {
 		h.logger.Info("Invalid token", zap.Error(err))
 		writeJSONError(w, http.StatusUnauthorized, domain.UnauthorizedMessage)

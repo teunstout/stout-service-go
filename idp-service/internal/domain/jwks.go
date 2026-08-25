@@ -15,7 +15,6 @@ type JwksKeys struct {
 	Keys []Jwks `json:"keys"`
 }
 
-// https://auth0.com/docs/secure/tokens/json-web-tokens/json-web-key-set-properties
 type Jwks struct {
 	Alg string   `json:"alg"`
 	Kty string   `json:"kty"`
@@ -44,10 +43,9 @@ func CreateJwksKeys(publicKey *rsa.PublicKey) JwksKeys {
 }
 
 func encodeJWKParams(pub *rsa.PublicKey) (n string, e string) {
-	// N: big.Int has a Bytes() method that returns big-endian bytes
+
 	n = base64.RawURLEncoding.EncodeToString(pub.N.Bytes())
 
-	// E: convert int to big-endian bytes, trim leading zeros
 	eBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(eBytes, uint64(pub.E))
 	eBytes = bytes.TrimLeft(eBytes, "\x00")

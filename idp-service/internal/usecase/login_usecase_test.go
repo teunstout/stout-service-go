@@ -16,7 +16,7 @@ type fakeAccountRepo struct {
 	getErr  error
 }
 
-func (f *fakeAccountRepo) AccountExists(username string) (bool, error) { return false, nil }
+func (f *fakeAccountRepo) AccountExists(username string) (bool, error)          { return false, nil }
 func (f *fakeAccountRepo) CreateAccount(username string, password string) error { return nil }
 func (f *fakeAccountRepo) GetAccountByUsername(username string) (domain.Account, error) {
 	if f.getErr != nil {
@@ -45,7 +45,7 @@ func (f *fakeCsrfRepo) CreateCsrfToken(token string, accountID int32, expiresAt 
 }
 func (f *fakeCsrfRepo) GetCsrfIdBySessionToken(token string) (int32, error) { return 0, nil }
 func (f *fakeCsrfRepo) DeleteCsrfTokensByAccountId(accountID int32) error   { return nil }
-func (f *fakeCsrfRepo) DeleteCsrfToken(token string) error                 { return nil }
+func (f *fakeCsrfRepo) DeleteCsrfToken(token string) error                  { return nil }
 
 func testSigningKey(t *testing.T) *rsa.PrivateKey {
 	t.Helper()

@@ -16,7 +16,7 @@ func NewExampleUsecase(repo *repository.ExampleRepository) *ExampleUsecase {
 
 func (u *ExampleUsecase) ProcessExample(input domain.ExampleInput) (*domain.Example, error) {
 	example := &domain.Example{
-		ID:   generateID(), // Assume generateID is a helper function
+		ID:   generateID(),
 		Name: input.Name,
 	}
 
